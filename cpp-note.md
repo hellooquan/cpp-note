@@ -5,10 +5,24 @@
 - [1. 加入了string这种数据类型](#1-加入了string这种数据类型)
   - [1.1 高频函数速查](#11-高频函数速查)
   - [1.2 每个函数的最简写法](#12-每个函数的最简写法)
+    - [长度与判空](#长度与判空)
+    - [取字符](#取字符)
+    - [加内容](#加内容)
+    - [原地修改](#原地修改)
+    - [删除](#删除)
+    - [查找](#查找)
+    - [截取](#截取)
+    - [比较](#比较)
+    - [交给 C API 与数字互转](#交给-c-api-与数字互转)
+    - [读一整行](#读一整行)
+    - [遍历](#遍历)
   - [1.3 九个坑](#13-九个坑)
 - [2. const_cast,static_cast,dynamic_cast](#2-const_caststatic_castdynamic_cast)
   - [2.1 const_cast](#21-const_cast)
+    - [处理常目标指针](#处理常目标指针)
   - [2.2 static_cast](#22-static_cast)
+    - [增加可读性](#增加可读性)
+    - [提高安全性](#提高安全性)
   - [2.3 dynamic_cast](#23-dynamic_cast)
 - [3. 函数重载](#3-函数重载)
   - [3.1 可以形成重载的情形](#31-可以形成重载的情形)
@@ -17,6 +31,9 @@
 - [4. 左、右值传递参数，&和&&](#4-左右值传递参数和)
 - [5. 引用&的本质](#5-引用的本质)
 - [6. 枚举](#6-枚举)
+  - [匿名枚举的四种用法](#匿名枚举的四种用法)
+  - [枚举能不能当 #define 用](#枚举能不能当-define-用)
+  - [枚举的 sizeof:由底层类型决定,不是固定 int](#枚举的-sizeof由底层类型决定不是固定-int)
 - [7. 引用返回值解析](#7-引用返回值解析)
 - [8. 异常](#8-异常)
   - [8.1 栈展开：异常穿过函数时发生了什么](#81-栈展开异常穿过函数时发生了什么)
@@ -29,6 +46,19 @@
 - [13. std::move](#13-stdmove)
 - [14. `Cat(const std::string &name) : _name(name) {}` 和 `Cat(std::string name) : _name(std::move(name)) {}`](#14-catconst-stdstring-name--_namename--和-catstdstring-name--_namestdmovename-)
 - [15. 初始化列表](#15-初始化列表)
+  - [15.1 类中的 const 成员数据](#151-类中的-const-成员数据)
+  - [15.2 初始化列表的书写顺序 ≠ 实际初始化顺序](#152-初始化列表的书写顺序--实际初始化顺序)
+- [16. 编译期常量:const 与 constexpr](#16-编译期常量const-与-constexpr)
+  - [16.1 编译期常量 vs 运行期只读](#161-编译期常量-vs-运行期只读)
+  - [16.2 constexpr 有什么用](#162-constexpr-有什么用)
+- [17. 继承 + 动态内存管理(深拷贝遇上继承)](#17-继承--动态内存管理深拷贝遇上继承)
+
+
+
+
+
+
+
 
 ## 1. 加入了string这种数据类型
 
@@ -179,6 +209,8 @@ for (size_t i = 0; i < s.size(); i++) cout << s[i];   // abc
 - dynamic_cast：专用于类类型的上下代际间的转换
 
 ### 2.1 const_cast
+
+来源:routine/0911/const_cast.cpp
 
 - const_cast 旨在去除标识符的 cv 限定属性（即 const 与 volatile）
 - const_cast 只能作用于指针或引用类型
@@ -497,8 +529,6 @@ int main()
 }
 ```
 
-补上右值引用(`&&`)那一半:
-
 三种引用参数的分工:
 
 | 参数写法 | 能接什么 | 想表达的意思 |
@@ -548,7 +578,7 @@ int main()
 
 - `const T &` 是唯一能同时绑左值和右值的引用,所以"只读的参数"一律写 `const T &`
 - 右值引用变量本身是左值(见上面最后一条)
-- 你笔记里已有的那条:普通引用绑右值编译报错 `cannot bind non-const lvalue reference of type 'int&' to an rvalue of type 'int'`
+- 普通引用绑右值编译报错 `cannot bind non-const lvalue reference of type 'int&' to an rvalue of type 'int'`
 
 ## 5. 引用&的本质
 
@@ -628,11 +658,373 @@ int main(int argc, char const *argv[])
 }
 ```
 
+enum 是给一组整数起名字的类型:名字在自己这组里唯一,写代码时不用记数字。
+
+定义和取值规则:
+
+```cpp
+enum gender { male, female };                       // 不写 = 就从 0 开始递增: male=0, female=1
+enum color  { red = 1, green, blue = 10, black };   // 手动给值: green=2(接着上一个 +1), black=11
+enum { MAX_N = 8 };                                 // 匿名枚举:只要一组常量,不要类型名
+```
+
+`enum gender{male, female} sex;` 这种写法是"定义类型的同时声明一个变量",一句话干两件事:定义类型 gender,再声明一个性别叫 sex 的变量,`sex` 的类型就是 `gender`。
+
+实测:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+enum gender { male, female } sex;           // 定义类型的同时声明变量
+enum color  { red = 1, green, blue = 10, black };
+
+int main()
+{
+    cout << "male=" << male << " female=" << female << " sizeof(gender)=" << sizeof(gender) << "\n";
+    cout << "green=" << green << " black=" << black << "\n";
+    sex = female;
+    int n = sex;                             // 枚举 -> int:隐式可以
+    cout << "sex = " << sex << "   当 int 用 n = " << n << "\n";
+    cout << "male + 1 = " << male + 1 << "\n";       // 参与运算就退化成 int
+}
+```
+
+实测输出:
+
+```
+male=0 female=1 sizeof(gender)=4
+green=2 black=11
+sex = 1   当 int 用 n = 1
+male + 1 = 1
+```
+
+要点:
+
+- 不给值就从 0 开始,只给第一个值后面自动 +1,也能手动跳(blue = 10)
+- 枚举值名直接进外层作用域(unscoped enum):写 `male` 不写 `gender::male`;类型名 `gender` 在 C++ 里不用 typedef 就能直接当类型用
+- 枚举值都是编译期常量,所以能当 case 标签、数组长度、结构体里的状态字段
+- 枚举 → int 隐式可以;int → 枚举必须显式强转,直接写 `gender sex = 1;` 报错:
+
+```
+error: invalid conversion from 'int' to 'gender' [-fpermissive]
+```
+
+- sizeof 默认 4(底层当 int 处理);C++11 起可以指定底层类型
+- C++11 的 enum class(强枚举)是另一套规矩:
+
+```cpp
+#include <iostream>
+#include <cstdint>
+using namespace std;
+
+enum class Gender : uint8_t { male, female };   // 名字带作用域 + 指定底层类型
+
+int main()
+{
+    cout << "sizeof(Gender)=" << sizeof(Gender) << "\n";
+    cout << "(int)Gender::female=" << (int)Gender::female << "\n";
+    Gender g = Gender::male;                     // 必须写作用域,写成 male 不认
+    (void)g;                                     // 只为演示,避免未使用变量警告
+}
+```
+
+```
+sizeof(Gender)=1
+(int)Gender::female=1
+```
+
+想拿它当整数用、或者用整数初始化它,都不行 —— 这就是"强"的地方:
+
+```
+error: cannot convert 'Gender' to 'int' in initialization      // int n = g;
+error: cannot convert 'int' to 'Gender' in initialization      // Gender h = 0;
+```
+
+坑:
+
+- **枚举打印出来是数字不是名字**:`cout << female` 得到 1,名字只存在于源码里。想要名字得自己转:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+enum gender { male, female };
+const char *to_str(gender g) { return g == male ? "male" : "female"; }
+
+int main()
+{
+    gender sex = female;
+    switch (sex) {
+        case male:   cout << "男\n"; break;
+        case female: cout << "女\n"; break;
+    }
+    cout << "名字:" << to_str(sex) << "  直接打印:" << sex << "\n";
+}
+```
+
+```
+女
+名字:female  直接打印:1
+```
+
+- **枚举值名会占外层名字**:同一作用域里两组枚举不能有同名值,也不能再定义同名变量
+
+```
+error: 'male' conflicts with a previous declaration          // 第二个 enum 里又写一个 male
+error: 'int male' redeclared as different kind of entity     // int male = 3;
+```
+
+- **switch 漏 case 编译器会提醒**(unscoped enum 会被检查):
+
+```
+warning: enumeration value 'female' not handled in switch [-Wswitch]
+```
+
+- 值允许重复,也允许强转塞一个不在枚举里的值(编译放行,逻辑自己负责):`gender g = (gender)99;` 输出 99
+### 匿名枚举的四种用法
+
+一句话:匿名枚举就是一组"有名字的编译期常量",不带类型名 —— 只有那些名字能用,它没法拿来声明变量。
+
+用法 1:编译期常量(数组长度、模板参数、case 标签)
+
+```cpp
+#include <iostream>
+#include <array>
+using namespace std;
+
+enum { MAX_N = 8, BUF = 64 };
+
+int main()
+{
+    int arr[MAX_N];                     // 当数组长度
+    for (int i = 0; i < MAX_N; i++) arr[i] = i * i;
+    cout << "arr[7]=" << arr[7] << "  sizeof(arr)=" << sizeof(arr) << "\n";
+
+    array<int, MAX_N> a2{};             // 当模板参数
+    cout << "a2.size()=" << a2.size() << "\n";
+
+    char buf[BUF] = {0};
+    cout << "sizeof(buf)=" << sizeof(buf) << "\n";
+}
+```
+
+实测输出:
+
+```
+arr[7]=49  sizeof(arr)=32
+a2.size()=8
+sizeof(buf)=64
+```
+
+用法 2:位掩码(最实用的一种)
+
+```cpp
+enum { RD = 1, WR = 2, EX = 4 };        // 必须是 2 的幂,才能按位组合
+
+int perm = RD | EX;                     // 值自动退化成 int,能直接 |
+bool can_write = perm & WR;             // 检查某一位在不在
+```
+
+实测(perm = RD | EX):
+
+```
+perm=5
+有读权限? 有
+有写权限? 没有
+```
+
+用法 3:类内 / 函数内的小常量(宏做不到的事)
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Pool {
+    enum { BLOCK = 32, COUNT = 4 };     // 只有这个类的成员函数看得见
+public:
+    void info() const { cout << "块大小 " << BLOCK << ",共 " << COUNT << " 块\n"; }
+};
+
+void f() { enum { LOCAL_MAX = 3 }; cout << "func local " << LOCAL_MAX << "\n"; }
+```
+
+实测输出:块大小 32,共 4 块 / func local 3
+
+用法 4:错误码 + switch
+
+```cpp
+enum { OK = 0, ERR_OPEN = 1, ERR_READ = 2 };
+
+const char *msg(int code)
+{
+    switch (code) {
+        case OK:       return "成功";
+        case ERR_OPEN: return "打不开文件";
+        case ERR_READ: return "读失败";
+    }
+    return "未知";
+}
+```
+
+匿名枚举、#define、const int 三者的分工:
+
+- `#define MAX 8`:纯文本替换,没有作用域、没有类型,调试器里看不到名字
+- `enum { MAX_N = 8 };`:编译期常量,不占存储,连地址都取不到 —— `int *p = &MAX_N;` 报 `error: lvalue required as unary '&' operand`
+- `const int C_N = 8;`:也能当数组长度,但它是个真实对象,取地址/绑引用就会实例化一份存储 —— `const int *p = &C_N;` 合法(实测 *p=8)
+
+坑:
+
+- 没有类型名,不能声明变量:`VALUE v;` → `error: 'VALUE' was not declared in this scope`。想要"类型 + 变量"就得起名(`enum gender { male, female } sex;`)
+- 值名进所在作用域,重名直接报错:`error: 'MAX_N' conflicts with a previous declaration`
+- 位掩码的值必须是 2 的幂(1、2、4、8),写 1、2、3 就会互相重叠
+- 值超出 int 范围时编译器会自己挑更大的底层类型(实测 `enum { BIG = 0x100000000LL };` 编得过);想自己定底层类型也行,匿名也能写:`enum : long long { BIG = 5000000000LL };` → 实测 sizeof(BIG)=8
+
+### 枚举能不能当 #define 用
+
+一句话:能替代 #define 里"一个整数常量"这一类(而且是推荐做法),但 #define 另外几类功能枚举一概做不到 —— 分界线是预处理期 vs 编译期。
+
+1) #if / #ifdef 完全看不见枚举(最危险的一条)
+
+```cpp
+#include <iostream>
+using namespace std;
+
+enum { VERSION = 2 };
+
+int main()
+{
+#if VERSION >= 2
+    cout << "走了新分支\n";
+#else
+    cout << "走了旧分支:预处理器把没定义的 VERSION 当 0\n";
+#endif
+}
+```
+
+实测输出:走了旧分支:预处理器把没定义的 VERSION 当 0
+
+把第一行换成 `#define VERSION 2`,同一份代码输出变成:走了新分支
+
+枚举是编译期的名字,预处理器根本不认识它 —— `#if` / `#ifdef` 里它按"未定义的标识符 = 0"处理,条件静默不成立。加 -Wundef 才会提醒:
+
+```
+warning: 'VERSION' is not defined, evaluates to '0' [-Wundef]
+```
+
+2) 枚举装不下非整数,宏什么都能装
+
+```cpp
+enum { NAME = "hyq" };
+```
+
+```
+error: enumerator value for 'NAME' must have integral or unscoped enumeration type
+```
+
+宏没这个限制,它只是文本替换:
+
+```cpp
+#define MY_TYPE long long      // 类型别名
+#define NAME    "hyq"          // 字符串
+```
+
+实测输出:NAME=hyq x=1
+
+所以这四类宏能力枚举一个都没有:条件编译、宏函数(如 MAX2(a,b))、字符串常量、类型别名;再加上 # 字符串化、## 拼接、头文件保护宏。
+
+3) 反过来是优势:宏没有作用域,枚举有
+
+```cpp
+#define MAX 8
+struct S { int MAX = 1; };      // 被替换成 int 8 = 1;
+```
+
+```
+error: expected unqualified-id before numeric constant
+note: in expansion of macro 'MAX'
+```
+
+把第一行换成 `enum { MAX = 8 };`,同一段代码正常:实测输出 `s.MAX=1  外面的 MAX=8`
+
+4) 调试信息里的证据(编译带 -g)
+
+```
+d7.o(枚举)里搜 ENUM_CONST: 1 次
+d8.o(宏)  里搜 MACRO_CONST: 0 次
+```
+
+宏的名字在预处理阶段就没了,调试器里看不到。
+
+C++ Core Guidelines 的 Enum.1 就是"优先用枚举代替宏"(理由正是"宏不遵守作用域和类型规则,名字在预处理后消失");同章 Enum.6 又说"避免匿名枚举"(不能声明类型、名字容易撞)—— 所以留着当常量没问题,一旦要传参/声明变量就给它起名。
+
+### 枚举的 sizeof:由底层类型决定,不是固定 int
+
+一句话:不指定底层类型时,底层类型由编译器/ABI 决定,唯一硬要求是"必须装得下所有枚举值";GCC 的习惯是能装进 int 就用 int,装不下就自动换更大的。
+
+实测:
+
+```
+sizeof(gender)=4          // 普通枚举,值 0、1
+sizeof(small)=4           // 值 1、2、3 —— 不会缩成 1
+sizeof(neg)=4             // 有负数 -1
+sizeof(uint_e)=4          // 值 0xFFFFFFFF 装不进 int → 变 unsigned int,仍 4
+sizeof(big)=8             // 值 0x100000000 → 换成 8 字节的类型
+sizeof(E8)=1              // enum E8 : uint8_t —— 自己指定底层类型
+sizeof(Gender)=4          // enum class 不给底层类型 → 默认 int
+sizeof(G8)=1              // enum class G8 : uint8_t
+sizeof(male)=4            // 枚举值的类型就是枚举类型(和 C 不同,C 里枚举值是 int)
+sizeof(int)=4
+```
+
+同一个程序加 -fshort-enums(让枚举按最小类型存):
+
+```
+sizeof(gender)=1  sizeof(small)=1  sizeof(neg)=1
+sizeof(uint_e)=4  sizeof(big)=8
+sizeof(Gender)=4         // 强枚举默认底层 int,这个开关不改它
+```
+
+换架构(aarch64-linux-gnu-gcc,看汇编里 return 的立即数):
+
+```
+默认:                       size_gender → mov w0, 4
+加 -fshort-enums:           size_gender → mov w0, 1
+x86-64 本地默认:             movl $4, %eax
+x86-64 本地加 -fshort-enums: movl $1, %eax
+```
+
+所以"默认 4 字节"是各编译器/ABI 的共同习惯,不是语言铁律。
+
+为什么要在意 —— 结构体里放枚举,布局跟着底层类型走:
+
+```cpp
+#include <cstdint>
+
+enum gender { male, female };           // 底层类型 = int
+enum g8 : uint8_t { m8, f8 };           // 底层类型 = uint8_t
+
+struct S1 { char c; enum gender g; };   // 实测 sizeof = 8(c 后面补 3 字节,enum 占 4)
+struct S2 { char c; enum g8 g; };       // 实测 sizeof = 2(enum 只占 1)
+```
+
+协议帧、寄存器映射、写文件/存 flash 的结构体里放枚举,大小一变数据就错位 —— 这种场合一定要写死底层类型:`enum gender : uint8_t { male, female };`,这样 sizeof 保证 1、和平台无关。
+
+要点:
+
+- 标准口径:不指定底层类型时它由实现选择,必须能表示全部枚举值,而且除非值装不下、否则不大于 int
+- 强枚举 enum class 不指定底层类型时固定是 int
+- 想要大小可控 → 显式指定底层类型,别指望默认值
+- 枚举量(枚举值)的类型是枚举类型本身,只是它到 int 的转换是隐式的,用起来感觉像 int
 ## 7. 引用返回值解析
+
+来源:routine/0915/Counter &.cpp
 
 一句话:返回**引用**=把原件交给你,返回**值**=给你一份拷贝。区别落在三点:能不能改原件、有没有拷贝开销、会不会悬垂。
 
 正确用法(返回的东西活得比你函数长):
+
+⭐ 重点
 
 ```cpp
 #include <iostream>
@@ -1112,7 +1504,7 @@ const Tmp &r = Tmp(2);   // 析构被推迟到 r 的作用域结束（生存期�
 Tmp &&rr = Tmp(3);       // 右值引用绑定，同样延长
 ```
 
-绑定规则（本机 g++ 15.2 / C++17 实测）：
+绑定规则：
 
 | 写法 | 结果 |
 | --- | --- |
@@ -1183,7 +1575,6 @@ Cat(std::string name) : _name(std::move(name)) {}
 
 B 里 `_name(std::move(name))` 的 `std::move` 不能省：形参 `name` 是有名字的变量，是左值，不 move 就会走拷贝构造，前面那次移动就白省了。
 
-上面表格里的拷贝/移动次数来自本机 g++ 15.2 `-std=c++17` 实测：用一个计数类，逐个场景跑 `main` 打印。
 
 ## 15. 初始化列表
 
@@ -1195,3 +1586,522 @@ public:
 
 Point p = {1, 2};   // C++11 起，这是隐式转换
 ```
+
+### 15.1 类中的 const 成员数据
+
+一句话:const 成员是"每个对象出生时登记一次"的数据,登记完就锁死;而且这次登记只能发生在初始化列表里。
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Student {
+public:
+    const int id;                // const 成员:出生就定死
+    string name;
+    mutable int look_times = 0;  // mutable 是唯一例外
+
+    Student(int i, string n) : id(i), name(n) {}   // 唯一一次给值的机会
+
+    void show() const
+    {
+        look_times++;            // const 成员函数里改 mutable 成员:合法
+        cout << "id=" << id << " name=" << name << " 查了 " << look_times << " 次\n";
+    }
+};
+
+int main()
+{
+    Student s(2026, "hyq");
+    s.show();
+    s.show();
+}
+```
+
+实测输出:
+
+```
+id=2026 name=hyq 查了 1 次
+id=2026 name=hyq 查了 2 次
+```
+
+三条铁律(编译器逐个把关):
+
+1. 只能在初始化列表里给值,搬进构造函数体就编不过:
+
+```cpp
+struct A { const int id; A(int v) { id = v; } };
+```
+
+```
+error: uninitialized const member in 'const int' [-fpermissive]
+note: 'const int A::id' should be initialized
+error: assignment of read-only member 'A::id'
+```
+
+gcc 一次报两条,其实说的是同一件事:构造函数体里那句 `id = v` 是"赋值",而 const 成员的第一次给值只认初始化列表 —— 初始化列表里没给(第一条"没初始化"),函数体里又想改(第二条"只读成员不能赋值")。
+
+2. 忘了给值,构造函数本身就不合法:
+
+```cpp
+struct A { const int id; A() {} };
+```
+
+```
+error: uninitialized const member in 'const int' [-fpermissive]
+note: 'const int A::id' should be initialized
+```
+
+3. 对象构造完再改:
+
+```cpp
+struct A { const int id; A(int v) : id(v) {} };
+int main() { A a(1); a.id = 2; }
+```
+
+```
+error: assignment of read-only member 'A::id'
+```
+
+两个补充:
+
+- 可以在类里直接给默认值,而且只有初始化列表能覆盖它(const 成员唯一允许"再给一次"的地方):
+
+```cpp
+#include <iostream>
+using namespace std;
+
+struct A {
+    const int id = 0;            // 类内默认值:每个对象默认 0
+    A() = default;
+    A(int v) : id(v) {}          // 初始化列表覆盖它
+};
+
+int main() { A a, b(7); cout << "a.id=" << a.id << "  b.id=" << b.id << "\n"; }
+```
+
+```
+a.id=0  b.id=7
+```
+
+- mutable 是唯一的开口:const 成员函数里只允许改 mutable 成员(上面 look_times 就是靠它自增的)
+
+最大的坑(连带后果):
+
+- **一个 const 成员会把整个类的拷贝赋值运算符删掉**,`a = b` 直接编不过:
+
+```cpp
+struct A { const int id; A(int v) : id(v) {} };
+int main() { A a(1), b(2); a = b; }
+```
+
+```
+error: use of deleted function 'A& A::operator=(const A&)'
+note: 'A& A::operator=(const A&)' is implicitly deleted because the default definition would be ill-formed
+```
+
+影响:这样的类不能整体赋值,也就不能用在需要赋值的场景(排序、erase、按值交换)。所以加 const 成员前先问一句"这个类以后还要不要整体赋值";只是想"字段不给外面改",用 private + 只给 getter 更划算,不牺牲赋值能力。
+
+- static const 成员是另一回事:它属于类不属于对象,所有对象共用一份,整型可以类内直接给值:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+struct A {
+    static const int MAX = 100;
+    const int id;
+    A(int v) : id(v) {}
+};
+
+int main() { cout << "A::MAX=" << A::MAX << "\n"; }
+```
+
+```
+A::MAX=100
+```
+
+记忆锚点:const 成员 = 出生登记一次的身份证号 —— 登记地点只能是初始化列表,登记完谁也不能改,代价是整个类失去赋值能力。
+
+### 15.2 初始化列表的书写顺序 ≠ 实际初始化顺序
+
+一句话:成员按**声明顺序**初始化,初始化列表里怎么写都改不了它。
+
+```cpp
+struct A {
+    int a; int b;
+    A(int x) : b(x), a(b + 1) {}   // 看着先给 b,实际 a 先初始化
+};
+```
+
+g++ 会直接点出来:
+
+```
+warning: 'A::b' will be initialized after [-Wreorder]
+warning: member 'A::b' is used uninitialized [-Wuninitialized]
+```
+
+实测 `A o(10);` 输出:
+
+```
+a=1 b=10
+```
+
+a 里面用的 b 此时还没赋值,读到的是垃圾值(这次恰好是 1)。做法:初始化列表按声明顺序写,或者用参数算,别去读另一个成员。
+
+## 16. 编译期常量:const 与 constexpr
+
+### 16.1 编译期常量 vs 运行期只读
+
+标准里没有"运行时常量"这个词。C++ 里要分的是两件事:编译期常量(标准术语是"常量表达式")和运行期只读(const 变量,值要等程序跑起来才知道);口语里说的"运行时常量",准确说法就是"只读变量"。
+
+一句话:const 只回答"能不能改",不回答"什么时候知道值"。看一个 const 到底是哪一种,只看它的初始化器。
+
+实测 1:值在运行期才定,const 也救不了
+
+```cpp
+#include <iostream>
+using namespace std;
+
+int main()
+{
+    int n; cin >> n;
+    const int N = n;                        // 只读,不是常量
+    switch (n) { case N: break; }
+}
+```
+
+```
+error: the value of 'N' is not usable in a constant expression
+note: 'N' was not initialized with a constant expression
+```
+
+同一份代码里 `int arr[N];` 这行 g++ 只给个 unused 警告 —— 那是变长数组(VLA),g++ 当扩展放过,标准 C++ 不允许。加 -pedantic-errors 就露馅:
+
+```
+error: ISO C++ forbids variable length array 'arr' [-Wvla]
+```
+
+实测 2:初始化器是常量的 const,就是货真价实的编译期常量
+
+```cpp
+#include <iostream>
+using namespace std;
+
+const int M = 5;
+constexpr int K = M + 1;
+enum { E = 8 };
+
+int main()
+{
+    int a1[M], a2[K], a3[E];                        // 三个都能当数组长度
+    int n = 1;
+    switch (n) { case M: case K: case E: break; }   // 也都能当 case 标签
+    cout << "sizeof(a1)=" << sizeof(a1) << " a2=" << sizeof(a2) << " a3=" << sizeof(a3) << "\n";
+}
+```
+
+```
+sizeof(a1)=20 a2=24 a3=32
+```
+
+实测 3:两者在运行期的差别,看目标文件最直观
+
+```
+只读变量占一块真实存储:
+  _ZL12GLOBAL_CONST    4 OBJECT  LOCAL  DEFAULT  5        ← 在 .rodata 段
+枚举值完全不占存储:
+  int *p = &ENUM_CONST;
+  error: lvalue required as unary '&' operand
+```
+
+实测 4:字符串字面量是运行期只读数据(.rodata,程序跑起来才有那块内存)
+
+```cpp
+int main() { char *s = (char *)"hi"; s[0] = 'H'; }
+```
+
+→ Segmentation fault,退出码 139
+
+要点:
+
+- const 管"能不能改",constexpr 管"是不是编译期就知道值",两件事
+- 判断一个 const 变量属于哪一种,只看初始化器:字面量/常量表达式 → 编译期常量;函数返回值、输入、别的变量 → 运行期只读
+- 枚举值、字面量、constexpr 变量不占存储(能当立即数、能进模板参数);只读变量占一份内存(.rodata/flash),好处是能取地址、能当数组传
+- C++20 的 constinit 是第三件事:只管"静态初始化",不保证是编译期常量
+
+### 16.2 constexpr 有什么用
+
+一句话:constexpr = "这个能在编译期算"的承诺。给变量用就是编译期常量;给函数用就是"能编译期算、也能当普通函数跑"的函数 —— 能算的场景编译期算完,算不了(参数运行期才知道)就照常当函数用。
+
+用处 1:把计算从运行期挪到编译期,算好的值直接变立即数
+
+```cpp
+constexpr int fact(int n) { return n <= 1 ? 1 : n * fact(n - 1); }
+
+int a_fact5(void) { return fact(5); }   // 实参是常量
+int b_fact(int n) { return fact(n); }   // 实参运行期才知道
+```
+
+实测汇编(-O2):
+
+```
+a_fact5 的函数体:  movl $120, %eax      ← 5! 直接算好
+                  ret
+b_fact:            imull %edi, %eax
+                   subl $1, %edi
+                   jne .L5              ← 老老实实跑循环
+```
+
+用处 2:必须编译期算的地方只有它填得上(数组长度、模板参数、case 标签、static_assert)
+
+```cpp
+constexpr int fact(int n) { return n <= 1 ? 1 : n * fact(n - 1); }
+int table[fact(4)];
+```
+
+实测目标文件里 table 大小 = 96 字节 = 24 个 int = 4!。
+
+用处 3:替代宏函数
+
+```cpp
+#define SQ_BAD(x) x*x
+constexpr int sq(int x) { return x * x; }
+```
+
+实测 `SQ_BAD(1+2)` = 5(被替换成 1+2*1+2),`sq(1+2)` = 9;而且 `int arr[sq(3)];` 合法(实测 sizeof(arr)=36)。宏还有"没类型检查、调试器看不见、不受命名空间管"这些毛病,constexpr 函数一个都没有。
+
+用处 4:编译期对象 + 编译期断言
+
+```cpp
+struct Point {
+    int x, y;
+    constexpr Point(int x, int y) : x(x), y(y) {}
+    constexpr int sum() const { return x + y; }
+};
+
+constexpr Point P{1, 2};
+static_assert(P.sum() == 3, "编译期就把错挡下来");
+int table[P.sum()];                     // 实测 sizeof(table)=12
+```
+
+用处 5:现代版编译期计算,不用再写模板特化递归
+
+```cpp
+#include <type_traits>
+using namespace std;
+
+constexpr int fib(int n)                // C++14 起循环、局部变量都能写
+{
+    int a = 0, b = 1;
+    for (int i = 0; i < n; i++) { int t = a + b; a = b; b = t; }
+    return a;
+}
+static_assert(fib(10) == 55);
+
+template <typename T> const char *describe(T)
+{
+    if constexpr (is_integral_v<T>) return "整数";   // 编译期分支,另一条不生成代码
+    else                            return "别的";
+}
+```
+
+实测输出:describe(1)=整数  describe(1.5)=别的
+
+用处 6:错误在编译期就被挡下来
+
+```cpp
+constexpr int div0(int a, int b) { return a / b; }
+constexpr int X = div0(1, 0);
+```
+
+```
+error: '(1 / 0)' is not a constant expression
+```
+
+坑:
+
+- constexpr 函数是"能编译期算",不是"一定编译期算";只有常量语境(数组长度、模板参数、static_assert、constexpr 变量初始化)才是硬保证
+- 反证:-O0 下 `a_fact5()` 的汇编还是 `movl $5, %edi; call _Z4facti`,到 -O2 才变成 `movl $120, %eax` —— 普通上下文里提前算不算取决于优化器,别以为标了 constexpr 就一定零开销
+- 参数来自运行期的调用,这个函数就是普通函数
+- 各版本逐步放宽:C++11 函数体只能一条 return,C++14 加循环和局部变量,C++17 加 if constexpr,C++20 才允许 new/虚函数/try
+- constexpr 变量隐含 const、必须初始化;C++17 起它是 inline 的(放头文件里多份包含不会重复定义)
+- 别和 constinit 混:constinit 只管静态初始化,不保证编译期常量
+
+记忆锚点:constexpr 就是把活挪到编译时 —— 该算的值提前算成常量,必须编译期算的地方填得上,顺手替掉宏函数,还能在编译期抓错。
+
+## 17. 继承 + 动态内存管理(深拷贝遇上继承)
+
+来源:routine/0915/继承动态内存管理.cpp
+
+一句话:派生类里有 `new` 出来的成员时,"三件事"都要分两半做 —— 基类那半显式交给基类的对应函数(拷贝构造 `: Person(r)`,拷贝赋值 `Person::operator=(r)`),自己那半自己管;基类析构再加 `virtual`,这一套才完整。
+
+```cpp
+#include <iostream>
+#include <cstring>
+using namespace std;
+
+class Person
+{
+    char *_name;
+
+public:
+    Person(const char *name = nullptr)
+    {
+        if (name != nullptr)
+        {
+            _name = new char[strlen(name) + 1];   // new 的字节数永远是 strlen + 1
+            strcpy(_name, name);
+        }
+        else
+            _name = nullptr;
+    }
+
+    Person(const Person &r)                        // 参数必须 const 引用,才能拷 const 对象和临时对象
+    {
+        if (r._name != nullptr)
+        {
+            _name = new char[strlen(r._name) + 1];
+            strcpy(_name, r._name);
+        }
+        else
+            _name = nullptr;
+    }
+
+    Person &operator=(const Person &r)
+    {
+        if (this == &r)                            // 自赋值直接返回,否则下面会先把源头删掉
+            return *this;
+
+        char *tmp = nullptr;                       // 先把新数据准备好,再删旧的
+        if (r._name != nullptr)
+        {
+            tmp = new char[strlen(r._name) + 1];
+            strcpy(tmp, r._name);
+        }
+        delete[] _name;
+        _name = tmp;
+
+        return *this;
+    }
+
+    virtual ~Person() { delete[] _name; }          // 基类析构必须 virtual:delete 基类指针时派生类析构才会跑
+
+    void show() const
+    {
+        cout << "姓名: " << (_name ? _name : "(空)") << ",";   // 空指针要判,cout << nullptr 会把流弄坏
+    }
+};
+
+class Student : public Person
+{
+    char *_id;
+
+public:
+    Student(const char *name, const char *id = nullptr)
+        : Person(name)
+    {
+        if (id != nullptr)
+        {
+            _id = new char[strlen(id) + 1];
+            strcpy(_id, id);
+        }
+        else
+            _id = nullptr;
+    }
+
+    Student(const Student &r)
+        : Person(r)                                // 基类那半交给基类的拷贝构造
+    {
+        if (r._id != nullptr)
+        {
+            _id = new char[strlen(r._id) + 1];
+            strcpy(_id, r._id);
+        }
+        else
+            _id = nullptr;
+    }
+
+    Student &operator=(const Student &r)
+    {
+        if (this == &r)                            // 派生类这半也要自己判一次
+            return *this;
+
+        Person::operator=(r);                      // 不写这句,基类的 _name 就漏拷贝
+        delete[] _id;
+        if (r._id != nullptr)
+        {
+            _id = new char[strlen(r._id) + 1];
+            strcpy(_id, r._id);
+        }
+        else
+            _id = nullptr;
+
+        return *this;
+    }
+
+    ~Student() { delete[] _id; }
+
+    void show() const
+    {
+        Person::show();
+        cout << "学号: " << (_id ? _id : "(空)") << endl;
+    }
+};
+
+int main(int argc, char const *argv[])
+{
+    Student s1("Jack", "100");
+    s1.show();
+
+    Student s2(s1);      // 拷贝构造
+    s2.show();
+
+    s2 = s1;             // 拷贝赋值
+    s2.show();
+
+    s1 = s1;             // 自赋值
+    s1.show();
+
+    Student s3("Tom");   // id 用默认值 nullptr
+    s3.show();
+    cout << "上面这行之后输出还在:说明流没被搞坏" << endl;
+
+    Person *p = new Student("Amy", "202");
+    p->show();           // show() 不是虚函数,走基类版本,只打印姓名
+    cout << endl;
+    delete p;            // 有虚析构,派生类那半才会一起释放
+
+    return 0;
+}
+```
+
+实测输出:
+
+```
+姓名: Jack,学号: 100
+姓名: Jack,学号: 100
+姓名: Jack,学号: 100
+姓名: Jack,学号: 100
+姓名: Tom,学号: (空)
+上面这行之后输出还在:说明流没被搞坏
+姓名: Amy,
+```
+
+七行依次是:直接构造、拷贝构造、拷贝赋值、自赋值、id 用默认值 nullptr、判空之后流没被搞坏、基类指针调用非虚的 show()。
+
+要点:
+
+- 派生类拷贝构造的初始化列表必须写 `: Person(r)`:不写就是调用基类的默认构造 —— 基类没有默认构造直接编不过,有的话基类成员就是没被拷贝
+- 派生类拷贝赋值里必须写一句 `Person::operator=(r);`:不写这句,基类的 `_name` 漏拷贝
+- 自赋值检查要写两处(基类 `operator=` 一处,派生类 `operator=` 一处):`if (this == &r) return *this;`。赋值的第一步就是 `delete[]`,不挡自赋值就会先把源头删掉,再去读已经释放的内存
+- 赋值的顺序:先把新数据申请到临时指针,成功之后再 `delete[]` 旧的
+- `new char[strlen(s) + 1]`:strcpy 连结尾的 `'\0'` 一起写,少写 1 个字节就是堆越界,而且这种越界不一定当场崩,会静默踩坏堆
+- 参数一律写 `const T &`:非 const 引用既接不了 const 对象,也接不了函数返回的临时对象
+- 基类析构写 `virtual`:只要有多态删除(`Base *p = new Derived; delete p;`),不写 virtual 就只跑基类析构,派生类的堆成员泄漏
+- 打印 `char *` 成员之前判空:`cout << nullptr` 不崩,但会把 cout 置成失败状态,之后所有输出静默消失(比段错误更难查)
+- `show()` 不加 `virtual` 的话,`Person *p = new Student; p->show()` 走的是基类版本(实测只打印姓名);要按运行时类型调用就得加 virtual
+- 三法则:自己写了析构的类,拷贝构造和拷贝赋值通常也得自己写;再把移动构造、移动赋值补上就是五法则(第 11 节)
+
+记忆锚点:派生类的三件事都"分两半" —— 基类那半用 `Person(r)` / `Person::operator=(r)` 显式交出去,自己那半自己 new/delete;基类析构加 `virtual`,`delete 基类指针` 才安全。
