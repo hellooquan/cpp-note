@@ -34,6 +34,7 @@
   - [匿名枚举的四种用法](#匿名枚举的四种用法)
   - [枚举能不能当 #define 用](#枚举能不能当-define-用)
   - [枚举的 sizeof:由底层类型决定,不是固定 int](#枚举的-sizeof由底层类型决定不是固定-int)
+  - [类内枚举:把枚举定义在类里面](#类内枚举把枚举定义在类里面)
 - [7. 引用返回值解析](#7-引用返回值解析)
 - [8. 异常](#8-异常)
   - [8.1 栈展开：异常穿过函数时发生了什么](#81-栈展开异常穿过函数时发生了什么)
@@ -48,17 +49,21 @@
 - [15. 初始化列表](#15-初始化列表)
   - [15.1 类中的 const 成员数据](#151-类中的-const-成员数据)
   - [15.2 初始化列表的书写顺序 ≠ 实际初始化顺序](#152-初始化列表的书写顺序--实际初始化顺序)
+  - [15.3 类里直接给成员初值(默认成员初始化器)](#153-类里直接给成员初值默认成员初始化器)
 - [16. 编译期常量:const 与 constexpr](#16-编译期常量const-与-constexpr)
   - [16.1 编译期常量 vs 运行期只读](#161-编译期常量-vs-运行期只读)
   - [16.2 constexpr 有什么用](#162-constexpr-有什么用)
 - [17. 继承 + 动态内存管理(深拷贝遇上继承)](#17-继承--动态内存管理深拷贝遇上继承)
-
-
-
-
-
-
-
+- [18. 同族类类型转换(上行、下行、对象切片)](#18-同族类类型转换上行下行对象切片)
+  - [上行转换:子 → 父,直接赋值就行](#上行转换子--父直接赋值就行)
+  - [下行转换:父 → 子](#下行转换父--子)
+  - [对象之间的转换 = 切片](#对象之间的转换--切片)
+- [19. 模板 T 的类型匹配与引用折叠](#19-模板-t-的类型匹配与引用折叠)
+  - [19.1 四种写法,T 各推成什么](#191-四种写法t-各推成什么)
+  - [19.2 引用折叠:引用的引用是谁](#192-引用折叠引用的引用是谁)
+  - [19.3 为什么模板里的 T&& 左值右值都能接](#193-为什么模板里的-t-左值右值都能接)
+  - [19.4 std::forward<T> 为什么必须写 <T>](#194-stdforwardt-为什么必须写-t)
+  - [19.5 auto&& 是同一条规则](#195-auto-是同一条规则)
 
 ## 1. 加入了string这种数据类型
 
@@ -1016,6 +1021,156 @@ struct S2 { char c; enum g8 g; };       // 实测 sizeof = 2(enum 只占 1)
 - 强枚举 enum class 不指定底层类型时固定是 int
 - 想要大小可控 → 显式指定底层类型,别指望默认值
 - 枚举量(枚举值)的类型是枚举类型本身,只是它到 int 的转换是隐式的,用起来感觉像 int
+
+### 类内枚举:把枚举定义在类里面
+
+一句话:把 `enum` 写进类里,枚举值的名字就被**关进类这一层作用域** —— 类外面访问一律要带类名,换来的是不污染全局名字;枚举只是类型定义,**不占对象空间**。
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class File
+{
+public:
+    enum Mode { read, write };      // 枚举定义在类里面:名字属于 File 这一层作用域
+
+    void set(Mode m) { _m = m; }
+    Mode get() const { return _m; }
+
+private:
+    Mode _m = read;                 // 类里面直接用 read,不用写 File::read
+};
+
+int main()
+{
+    File f;
+    f.set(File::write);             // 类外面必须带上类名
+    cout << "f.get() = " << f.get() << endl;
+
+    cout << "File::read = " << File::read << ", File::write = " << File::write << endl;
+
+    File::Mode m = File::write;     // 枚举类型名也要带类名
+    cout << "m = " << m << endl;
+
+    cout << "sizeof(File) = " << sizeof(File) << endl;   // 枚举不占对象空间,只有 _m 那 4 字节
+
+    switch (f.get())                // 枚举是编译期常量,能当 case 标签(在类外面照样要带类名)
+    {
+    case File::read:  cout << "当前是 read" << endl;  break;
+    case File::write: cout << "当前是 write" << endl; break;
+    }
+}
+```
+
+实测输出:
+
+```
+f.get() = 1
+File::read = 0, File::write = 1
+m = 1
+sizeof(File) = 4
+当前是 write
+```
+
+三条读法:
+
+- **名字的归属变了**:普通 `enum` 的枚举值直接进外层作用域(写 `male` 就行),类内枚举的枚举值属于类,类外面必须写 `File::write`;连 `main` 里 `switch` 的 `case` 标签也一样,少写类名就报错:
+
+```cpp
+int x = write;     // 类外面直接写 write
+```
+
+```
+error: ‘write’ was not declared in this scope; did you mean ‘fwrite’?
+```
+
+- **枚举类型名也要带类名**:`File::Mode m = File::write;`
+- **枚举不占对象空间**:`sizeof(File)` 还是 4(类里只有 `_m` 这一个成员),枚举只是"给一组整数起名字"的类型定义
+
+类里面也放 `enum class`(C++11 强枚举)是同一个道理,只是要写全三段:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class File
+{
+public:
+    enum class Mode { read, write };
+
+    void set(Mode m) { _m = m; }
+    Mode get() const { return _m; }
+
+private:
+    Mode _m = Mode::read;              // 强枚举连类里面也要写枚举名
+};
+
+int main()
+{
+    File f;
+    f.set(File::Mode::write);          // 三段:类名::枚举名::值
+
+    cout << "f.get() == File::Mode::write : " << (f.get() == File::Mode::write) << endl;
+    cout << "sizeof(File::Mode) = " << sizeof(File::Mode) << endl;
+    cout << "(int)File::Mode::write = " << (int)File::Mode::write << endl;
+}
+```
+
+实测输出:
+
+```
+f.get() == File::Mode::write : 1
+sizeof(File::Mode) = 4
+(int)File::Mode::write = 1
+```
+
+强枚举少写一段不行,报错原文:
+
+```cpp
+class File { public: enum class Mode { read, write }; };
+
+int main()
+{
+    File::Mode m = File::write;    // 想要 File::Mode::write
+    (void)m;
+}
+```
+
+```
+error: ‘write’ is not a member of ‘File’
+```
+
+顺带一个实用的:底层类型会决定"当成员时占多少字节"(接上面 `枚举的 sizeof` 那条):
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class F1 { public: enum Mode { a, b };                      private: Mode m = a; };
+class F2 { public: enum Mode : unsigned char { a, b };      private: Mode m = a; };
+
+int main()
+{
+    cout << "sizeof(F1) = " << sizeof(F1) << ", sizeof(F1::Mode) = " << sizeof(F1::Mode) << endl;
+    cout << "sizeof(F2) = " << sizeof(F2) << ", sizeof(F2::Mode) = " << sizeof(F2::Mode) << endl;
+}
+```
+
+实测输出:
+
+```
+sizeof(F1) = 4, sizeof(F1::Mode) = 4
+sizeof(F2) = 1, sizeof(F2::Mode) = 1
+```
+
+坑:
+
+- 类内普通枚举的名字**只在类里**能省类名,类外(包括 `main` 里 `switch` 的 `case`)都要带 —— 报错原文上面两条
+- 别以为"类里加了枚举,对象就变大":枚举不占空间;只有当它是**成员变量**、或者底层类型被指定时,才按底层类型的大小算(`F2` 因为指定了 `unsigned char`,整个对象只有 1 字节)
+- `enum class` 必须写全 `类名::枚举名::值`,而且在类里也不能省枚举名(`Mode::read`);普通类内枚举在类里可以省(`read`)
+- `enum class` 不能隐式转成 `int`(要打印得写 `(int)File::Mode::write`),普通类内枚举可以
+
 ## 7. 引用返回值解析
 
 来源:routine/0915/Counter &.cpp
@@ -1750,6 +1905,173 @@ a=1 b=10
 
 a 里面用的 b 此时还没赋值,读到的是垃圾值(这次恰好是 1)。做法:初始化列表按声明顺序写,或者用参数算,别去读另一个成员。
 
+### 15.3 类里直接给成员初值(默认成员初始化器)
+
+一句话:C++11 起,成员可以在**类里直接写个初值**(`int x = 1;`),构造函数没管这个成员时它生效;构造函数初始化列表里给了值,类里这个就被忽略。优先级:**初始化列表 > 类里给的初值 > 什么都没给**。
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+enum level { high, medium, low };
+
+class Item
+{
+public:
+    int         i   = 42;                 // int
+    double      d   = 3.14;               // double
+    string      s   = "hello";            // 类对象
+    int         arr[3] = {1, 2, 3};       // 数组
+    level       lv  = medium;             // 枚举(和上面几种没区别)
+    const int   ci  = 7;                  // const 成员
+    int        *p   = nullptr;            // 指针
+
+    void show() const
+    {
+        cout << i << " " << d << " " << s << " " << arr[0] << arr[1] << arr[2]
+             << " lv=" << lv << " ci=" << ci << " p=" << (p ? "非空" : "空") << endl;
+    }
+};
+
+int main()
+{
+    Item it;
+    it.show();
+    cout << "sizeof(Item) = " << sizeof(Item) << endl;
+}
+```
+
+实测输出:
+
+```
+42 3.14 hello 123 lv=1 ci=7 p=空
+sizeof(Item) = 80
+```
+
+谁覆盖谁,一个类里就能试全:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class A
+{
+public:
+    int x = 1;                        // 类里给的初值
+
+    A() {}                            // 构造函数不管 x:用 1
+    A(int v) : x(v) {}                // 初始化列表给值:类里的 1 被忽略
+    A(int a, int b) { x = a + b; }    // 构造函数体里赋值:先默认成 1,再改成 a+b
+};
+
+int main()
+{
+    A a1;
+    A a2(100);
+    A a3(3, 4);
+    cout << "a1.x = " << a1.x << ", a2.x = " << a2.x << ", a3.x = " << a3.x << endl;
+}
+```
+
+实测输出:
+
+```
+a1.x = 1, a2.x = 100, a3.x = 7
+```
+
+`const` 成员也是同一套(这就是 15.1 那条的完整版,`const` 成员不一定非得靠初始化列表):
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class A
+{
+public:
+    const int a = 1;          // 类里的默认值(登记一次)
+
+    A() {}                    // 构造函数不管它:用默认的 1
+    A(int v) : a(v) {}        // 初始化列表给值:顶掉类里的默认值
+};
+
+int main()
+{
+    A d;
+    A c(9);
+    cout << "默认构造出来的 a = " << d.a << endl;
+    cout << "A(9) 构造出来的 a = " << c.a << endl;
+}
+```
+
+实测输出:
+
+```
+默认构造出来的 a = 1
+A(9) 构造出来的 a = 9
+```
+
+两种写法错的对照:
+
+```cpp
+class A
+{
+public:
+    const int a = 1;
+
+    A(int v) { a = v; }       // 构造函数体里给 const 成员赋值
+};
+```
+
+```
+error: assignment of read-only member ‘A::a’
+```
+
+```cpp
+class A
+{
+public:
+    const int a;              // 类里不给默认值,A() {} 的初始化列表里也不给
+
+    A() {}
+};
+```
+
+```
+error: uninitialized const member in ‘const int’ [-fpermissive]
+```
+
+三条规矩:
+
+- **初始化列表 > 类里初值 > 什么都没给**:谁离构造函数更近谁说了算;构造函数体里的赋值是"先按初值初始化好,再改一遍"
+- **按成员声明顺序执行(和 15.2 是同一个规矩)**:类里给初值也一样,引用后面的成员读到的是未初始化内存 —— 实测 `class B { int y = x + 1; int x = 1; };` 打出 `y = 1`(`x` 那格的原始字节恰好是 0),**gcc 一句警告都不给**
+- 类里给的初值**不占额外空间**:`sizeof` 只按成员本身的类型算,初值只是每个构造函数里自动多出来的一句初始化
+
+不行的几种:
+
+```cpp
+class A
+{
+public:
+    auto x = 1;            // error: non-static data member declared with placeholder ‘auto’
+    static int z = 5;      // error: ISO C++ forbids in-class initialization of non-const static member ‘A::z’
+};
+```
+
+`int x = 1;` 这行在**老标准里根本不存在**,`-std=c++98` 编就是:
+
+```
+error: non-static data member initializers only available with ‘-std=c++11’ or ‘-std=gnu++11’
+```
+
+坑:
+
+- 它是"默认值"不是"赋值":初始化列表里给了值,类里写的那个就作废,别以为类里的值一定生效
+- 构造函数**体**里给 `const` 成员赋值 = 编译错误(只能写在初始化列表里);但"类里给初值 + 初始化列表再给值"是合法的 —— 初始化列表赢
+- 成员之间互相引用要盯着声明顺序:顺序反了编译器不报错,值却是不确定的
+- `static` 成员(C++17 之前)不能这样给值;`auto` 不能当成员类型
+- 老教材里看不到这个写法,因为它是 C++11 才加的(`-std=c++11` 起)
+
 ## 16. 编译期常量:const 与 constexpr
 
 ### 16.1 编译期常量 vs 运行期只读
@@ -2105,3 +2427,482 @@ int main(int argc, char const *argv[])
 - 三法则:自己写了析构的类,拷贝构造和拷贝赋值通常也得自己写;再把移动构造、移动赋值补上就是五法则(第 11 节)
 
 记忆锚点:派生类的三件事都"分两半" —— 基类那半用 `Person(r)` / `Person::operator=(r)` 显式交出去,自己那半自己 new/delete;基类析构加 `virtual`,`delete 基类指针` 才安全。
+
+## 18. 同族类类型转换(上行、下行、对象切片)
+
+来源:routine/0915/同族类.cpp
+
+一句话:同族类 = 同一条继承链上的类(父类、子类、以及父类的父类……)。它们之间的转换只有两个方向 —— **子 → 父(上行)是隐式的、永远安全;父 → 子(下行)编译器不认,必须写显式转换,而且写错了它也不拦**。
+
+两个方向一张表:
+
+| 方向 | 叫法 | 怎么写 | 谁检查 | 结果 |
+| --- | --- | --- | --- | --- |
+| 子 → 父 | 上行转换 | `A *pa = &b;`(直接赋值,也可以 `static_cast`) | 编译期自动完成,不用写转换 | 安全 |
+| 父 → 子 | 下行转换 | `static_cast<B *>(pa)` | 没人查 | 真身不对就等着出事 |
+| 父 → 子 | 下行转换 | `dynamic_cast<B *>(pa)` | 运行期查真身 | 真身不对给 `nullptr` / 抛 `bad_cast` |
+| 子对象 → 父对象 | 对象切片 | `A a = b;` | 编译期允许,不报错 | 子类那半被切掉,数据没了 |
+
+### 上行转换:子 → 父,直接赋值就行
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class A
+{
+public:
+    int x = 1;
+    void fa() { cout << "A::fa 被调用" << endl; }
+};
+
+class B : public A
+{
+public:
+    int y = 2;
+    void fb() { cout << "B::fb 被调用" << endl; }
+};
+
+int main()
+{
+    B b;
+    b.x = 10;
+    b.y = 20;
+
+    A *pa = &b;                            // 上行:子类指针 -> 父类指针
+    A &ra = b;                             // 上行:子类对象 -> 父类引用
+
+    cout << "pa->x = " << pa->x << endl;   // 输出: pa->x = 10
+    pa->fa();                              // 输出: A::fa 被调用
+    cout << "ra.x = " << ra.x << endl;     // 输出: ra.x = 10
+
+    cout << "&b = " << (void *)&b << ", pa = " << (void *)pa << endl;
+    // 输出: &b = 0x7ffe635d1870, pa = 0x7ffe635d1870
+    //(每次运行地址都不一样,关键是这两个数永远相同:单继承下转父类指针不搬地址)
+}
+```
+
+为什么不用写转换:子类对象里面本来就**完整地含着一块父类子对象**,父类指针只是换了个视角去看这块内存,不会看到不存在的东西。
+
+代价是父类指针**只能看见父类那半**:
+
+```cpp
+pa->y = 1;   // error: ‘class A’ has no member named ‘y’
+pa->fb();    // 同理,编译不过
+```
+
+但有一件事会跟着真身走 —— **虚函数**(多态):
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class A { public: virtual void who() { cout << "我是 A" << endl; } };
+class B : public A { public: void who() override { cout << "我是 B" << endl; } };
+
+int main()
+{
+    B b;
+    A *pa = &b;
+    pa->who();   // 输出: 我是 B   —— 指针类型是 A,真正被调用的还是 B 的版本
+}
+```
+
+### 下行转换:父 → 子
+
+三层,一层比一层多花代价:直接赋值(编译期就不让)→ `static_cast`(编译期硬转,不看真身)→ `dynamic_cast`(运行期查真身)。
+
+先记住类长什么样(`virtual` 是 `dynamic_cast` 的前提):
+
+```cpp
+class Base
+{
+public:
+    int x = 1;
+    virtual ~Base() {}      // 有虚函数 = 多态类型
+};
+
+class Derived : public Base
+{
+public:
+    int y = 2;
+};
+```
+
+**一、直接赋值:编译期就不让**
+
+```cpp
+Base *p = &d;
+Derived *q = p;   // error: invalid conversion from ‘Base*’ to ‘Derived*’ [-fpermissive]
+```
+
+编译器的态度很明确:手里只有一个父类指针,它无法确认后面那半(子类新增成员)到底在不在。
+
+**二、`static_cast`:编译期硬转,不看真身 —— 危险就在这**
+
+```cpp
+Base b;
+Base *p2 = &b;                             // 真身是 Base,不是 Derived
+Derived *s = static_cast<Derived *>(p2);   // 照样转成功
+cout << (s != nullptr) << endl;            // 输出: 1
+cout << "s->y = " << s->y << endl;         // 输出: s->y = 0
+```
+
+那个 `0` 不是"没找到、返回 0"的意思 —— `Base` 里根本没有 `y` 那块内存,这个 `0` 是从 `b` 后面读到的**别的内存**。危险点正在这里:越界读往往给一个看着很正常的值,不崩、不报错,结果悄悄错。
+
+写进去就更明显,ASAN 能当场抓住(`Derived` 里加了一个 `long long y[8]`):
+
+```cpp
+Base *p = new Base;
+static_cast<Derived *>(p)->y[3] = 7;
+```
+
+```
+ERROR: AddressSanitizer: heap-buffer-overflow
+WRITE of size 8 at 0x6d7e914e0038 thread T0
+...
+0x6d7e914e0038 is located 24 bytes after 16-byte region [0x6d7e914e0010,0x6d7e914e0020)
+```
+
+那块内存只有 16 字节(就是 `Base` 的大小),按 `Derived` 的布局去写,自然写到外面去了。
+
+**三、`dynamic_cast`:带真身检查的转型**
+
+```cpp
+Base *p1 = &d;   // 真身是 Derived
+Base *p2 = &b;   // 真身是 Base
+
+cout << (dynamic_cast<Derived *>(p1) ? "成功" : "失败") << endl;
+// 输出: 成功
+cout << (dynamic_cast<Derived *>(p2) ? "成功" : "失败(nullptr)") << endl;
+// 输出: 失败(nullptr)
+```
+
+引用版没有"空引用"这种东西,失败只能抛:
+
+```cpp
+try
+{
+    Derived &r = dynamic_cast<Derived &>(*p2);
+    (void)r;
+}
+catch (const bad_cast &e)
+{
+    cout << e.what() << endl;   // 输出: std::bad_cast
+}
+```
+
+机制、前提(类必须是多态的)和坑,第 2.3 节已经写过,这里不重复;`static_cast` 和它的差别就是:多花的那点运行期时间,买的是"查真身"这一步。
+
+### 对象之间的转换 = 切片
+
+指针和引用只是换个视角看**同一个对象**,对象之间赋值则是真的**拷一份**,这时子类那半会被切掉:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class A
+{
+public:
+    int x = 1;
+    virtual void who() { cout << "我是 A" << endl; }
+};
+
+class B : public A
+{
+public:
+    int y = 2;
+    void who() override { cout << "我是 B" << endl; }
+};
+
+void talk(A a)      // 形参按值收父类:传子类对象进来也会被切
+{
+    a.who();
+}
+
+int main()
+{
+    B b;
+    b.x = 10;
+    b.y = 20;
+
+    A *pa = &b;
+    pa->who();      // 输出: 我是 B   —— 指针还指着那个 B 对象
+    A &ra = b;
+    ra.who();       // 输出: 我是 B   —— 引用一样
+
+    A acopy = b;    // 对象赋值:只把父类那半拷过来
+    cout << "acopy.x = " << acopy.x << endl;   // 输出: acopy.x = 10
+    acopy.who();    // 输出: 我是 A   —— acopy 自己已经是 A 对象了,多态没了
+
+    talk(b);        // 输出: 我是 A   —— 按值传参 = 又切了一次
+    return 0;
+}
+```
+
+一句话:**指针和引用不切(还指向原对象),按值拷贝才切**。
+
+反着来(父对象 → 子对象)同样不认:
+
+```cpp
+A a;
+B bcopy = a;   // error: conversion from ‘A’ to non-scalar type ‘B’ requested
+B *pb = &a;    // error: invalid conversion from ‘A*’ to ‘B*’ [-fpermissive]
+```
+
+`A a = b;` 之后想再读 `a.y` 也读不到:
+
+```cpp
+cout << a.y << endl;   // error: ‘class A’ has no member named ‘y’
+```
+
+坑:
+
+- 把 `static_cast` 当"向下转型"用:它编译期硬转、不看真身,真身不对照样给你一个非空指针,错误会拖到运行期,以"越界读 / 乱值 / 段错误"的形式出现。下行转换要么先确认真身,要么用 `dynamic_cast`。
+- 判断转型成没成功别只看指针空不空:`static_cast` 出来的**永远非空**(上面转出来的就是 1),只有 `dynamic_cast` 的 `nullptr` 才是"真身不对"的信号。
+- 能直接赋值的地方别写 `dynamic_cast`:上行转换是免费的,不需要任何转换语法。
+- 切片不报错、不崩溃,只是数据悄悄少了:子类新增的成员在父类对象里根本不存在,虚函数也不再是子类版本。函数按值收父类对象(`void f(A a)`)是切片最常见的现场,想保留多态就收引用或指针(`void f(const A &a)`)。
+- "`sizeof` 没变"不能证明没切片:`sizeof(A) = 16`、`sizeof(B) = 16`,子类新增的 `int y` 正好塞进了父类的填充空隙,大小一样,但 `y` 确实被切掉了。
+- 单继承时父子指针地址相同(`&b` 和 `pa` 打出来是一个地址),**多重继承下不一定**:父类子对象不在对象开头,转父类指针时会加偏移 —— `struct D : A, B` 的 `D x`,`A *pa = &x` 得到 `0x…13c`,而 `B *pb = &x` 得到 `0x…140`,差了 4 字节。先记住单继承的结论,多重继承的等后面用到再说。
+
+## 19. 模板 T 的类型匹配与引用折叠
+
+一句话:模板里的 `T` 不是你自己指定的,是编译器拿**实参**反推出来的;形参写成 `T` / `T&` / `const T&` / `T&&` 会各推出一套结果,而模板里的 `T&&` 之所以左值右值都能接,靠的就是**引用折叠**。
+
+### 19.1 四种写法,T 各推成什么
+
+| 形参写法 | 传左值 `int i` | 传右值 `3` | 传 `const int ci` | 想表达的意思 |
+| --- | --- | --- | --- | --- |
+| `byVal(T t)` | `T = int` | `T = int` | `T = int` | 按值:引用和顶层 const 全被剥掉 |
+| `byRef(T &t)` | `T = int` | 编译不过 | `T = const int` | 只接左值,实参的 const 会留在 T 里 |
+| `byCRef(const T &t)` | `T = int` | `T = int` | `T = int` | 左右值都接,const 是形参自带的,不占 T |
+| `byFwd(T &&t)` | `T = int&` | `T = int` | `T = const int&` | 转发引用:只有它会把 T 推成引用类型 |
+
+表里每格都是 `T` 的真身,直接看 `__PRETTY_FUNCTION__` 打出来的原文:
+
+```cpp
+#include <iostream>
+using namespace std;
+
+template <typename T> void byVal(T t)         { cout << "byVal  " << __PRETTY_FUNCTION__ << endl; }
+template <typename T> void byRef(T &t)        { cout << "byRef  " << __PRETTY_FUNCTION__ << endl; }
+template <typename T> void byCRef(const T &t) { cout << "byCRef " << __PRETTY_FUNCTION__ << endl; }
+template <typename T> void byFwd(T &&t)       { cout << "byFwd  " << __PRETTY_FUNCTION__ << endl; }
+
+int main()
+{
+    int i = 1;
+    const int ci = 2;
+
+    cout << "--- 实参是左值 int ---" << endl;
+    byVal(i);
+    byRef(i);
+    byCRef(i);
+    byFwd(i);
+
+    cout << "--- 实参是右值 3 ---" << endl;
+    byVal(3);
+    byCRef(3);
+    byFwd(3);
+
+    cout << "--- 实参是 const 左值 ---" << endl;
+    byVal(ci);
+    byRef(ci);
+    byCRef(ci);
+    byFwd(ci);
+}
+```
+
+实测输出:
+
+```
+--- 实参是左值 int ---
+byVal  void byVal(T) [with T = int]
+byRef  void byRef(T&) [with T = int]
+byCRef void byCRef(const T&) [with T = int]
+byFwd  void byFwd(T&&) [with T = int&]
+--- 实参是右值 3 ---
+byVal  void byVal(T) [with T = int]
+byCRef void byCRef(const T&) [with T = int]
+byFwd  void byFwd(T&&) [with T = int]
+--- 实参是 const 左值 ---
+byVal  void byVal(T) [with T = int]
+byRef  void byRef(T&) [with T = const int]
+byCRef void byCRef(const T&) [with T = int]
+byFwd  void byFwd(T&&) [with T = const int&]
+```
+
+三条读法:
+
+- **按值的 `T` 最干净**:`const int ci` 进来也只是 `int` —— 反正要拷一份,顶层 const 不带走
+- **`T &` 会把实参的 const 带进 T**:`byRef(ci)` 推成 `const int`,所以"只读参数"不要写 `T &`
+- **只有 `T &&` 会把 T 推成引用类型**:左值进来 `T = int&`,右值进来 `T = int`
+
+### 19.2 引用折叠:引用的引用是谁
+
+规则四条:
+
+| 组合 | 折叠成 |
+| --- | --- |
+| `T& &` | `T&` |
+| `T& &&` | `T&` |
+| `T&& &` | `T&` |
+| `T&& &&` | `T&&` |
+
+一句话记:**只要有一个是左值引用,结果就是左值引用;两个都是右值引用才是右值引用**(左值引用赢)。
+
+用类型别名制造"引用的引用"来实测(直接手写是编译不过的,见下面坑):
+
+```cpp
+#include <iostream>
+#include <type_traits>
+using namespace std;
+
+using L = int &;    // 给"左值引用类型"起个别名
+using R = int &&;   // 给"右值引用类型"起个别名
+
+int main()
+{
+    int i = 1;
+
+    L &a = i;       // int& &   -> int&
+    L &&b = i;      // int& &&  -> int&
+    R &c = i;       // int&& &  -> int&
+    R &&d = 1;      // int&& && -> int&&
+
+    cout << "L&  折成 int&  : " << is_same<decltype(a), int &>::value << endl;
+    cout << "L&& 折成 int&  : " << is_same<decltype(b), int &>::value << endl;
+    cout << "R&  折成 int&  : " << is_same<decltype(c), int &>::value << endl;
+    cout << "R&& 折成 int&& : " << is_same<decltype(d), int &&>::value << endl;
+}
+```
+
+实测输出:
+
+```
+L&  折成 int&  : 1
+L&& 折成 int&  : 1
+R&  折成 int&  : 1
+R&& 折成 int&& : 1
+```
+
+### 19.3 为什么模板里的 T&& 左值右值都能接
+
+以 `byFwd` 为例,折叠发生在"把 T 代进去"的那一刻:
+
+- `byFwd(i)`(左值):T 推成 `int&` → 形参变成 `int& &&` → 折叠成 `int&` → 接得住左值
+- `byFwd(3)`(右值):T 推成 `int` → 形参就是 `int &&` → 接得住右值
+
+所以**形参写成 `T&&`、且 T 是模板参数**的这种写法叫转发引用,它左值右值都能接,和普通右值引用不是一回事:
+
+```cpp
+void f(int &&x);      // 普通右值引用:只接右值(第 4 节那条)
+
+template <typename T>
+void g(T &&t);        // 转发引用:左值右值都接
+```
+
+反过来的实证:显式写模板实参就关掉了推导,折叠也不发生 —— `T = int`,形参就是 `int&&`,左值接不了:
+
+```cpp
+byFwd<int>(i);   // error: cannot bind rvalue reference of type ‘int&&’ to lvalue of type ‘int’
+```
+
+### 19.4 std::forward<T> 为什么必须写 <T>
+
+```cpp
+#include <iostream>
+#include <utility>
+using namespace std;
+
+void sink(int &x)  { cout << "   sink -> 左值版本" << endl; }
+void sink(int &&x) { cout << "   sink -> 右值版本" << endl; }
+
+template <typename T> void wrapper(T &&t)
+{
+    cout << "T = " << (is_lvalue_reference<T>::value ? "int&  (实参是左值)" : "int   (实参是右值)") << endl;
+
+    sink(t);                   // t 是有名字的变量 -> 左值
+    sink(std::forward<T>(t));  // 按 T 还原成进来时的那个值类别
+
+    cout << endl;
+}
+
+int main()
+{
+    int i = 1;
+
+    cout << "wrapper(i) 传左值:" << endl;
+    wrapper(i);
+
+    cout << "wrapper(2) 传右值:" << endl;
+    wrapper(2);
+}
+```
+
+实测输出:
+
+```
+wrapper(i) 传左值:
+T = int&  (实参是左值)
+   sink -> 左值版本
+   sink -> 左值版本
+
+wrapper(2) 传右值:
+T = int   (实参是右值)
+   sink -> 左值版本
+   sink -> 右值版本
+```
+
+- 不管实参是左是右,`t` 进到函数体里**都是有名字的变量 = 左值**(第 4 节最后那条),所以 `sink(t)` 永远走左值版本 —— 右值性在"传进去"那一步就丢了
+- `std::forward<T>(t)` 干的活就是**把进来时的值类别还回去**:`T` 是 `int&` 就给左值,`T` 是 `int` 就给右值
+- `<T>` 不能省:实测写成 `std::forward(t)` 报 `error: no matching function for call to ‘forward(int&)’` —— forward 的模板参数从实参推不出来,它要的就是你显式告诉它 T
+
+那拿 `std::move(t)` 替 `forward<T>(t)` 会怎样(实测):左值进来也会被当成右值送出去 ——
+
+```
+wrapper(i) 传的是左值,里面用 move:
+   sink -> 右值版本
+wrapper(2) 传的是右值:
+   sink -> 右值版本
+```
+
+区别一句话:**`move` 是无条件"当右值",`forward<T>` 是"按 T 还原"**。完美转发的固定搭配就是 `T&&` 形参 + `std::forward<T>(t)`。
+
+### 19.5 auto&& 是同一条规则
+
+```cpp
+#include <iostream>
+#include <type_traits>
+using namespace std;
+
+int main()
+{
+    int i = 1;
+
+    auto &&r1 = i;   // 实参是左值:auto = int&  -> int& && -> int&
+    auto &&r2 = 2;   // 实参是右值:auto = int   -> int &&   -> int&&
+
+    cout << "auto&& 接左值,是左值引用: " << is_lvalue_reference<decltype(r1)>::value << endl;
+    cout << "auto&& 接右值,是右值引用: " << is_rvalue_reference<decltype(r2)>::value << endl;
+}
+```
+
+实测输出:
+
+```
+auto&& 接左值,是左值引用: 1
+auto&& 接右值,是右值引用: 1
+```
+
+`auto&&` 和模板 `T&&` 走的是同一套推导 + 折叠:`r1` 其实是 `int&`,`r2` 是 `int&&`(这也是 `for (auto &&x : v)` 能改容器元素的原因)。
+
+坑:
+
+- **直接手写"引用的引用"是语法错误**,折叠只发生在 typedef / 模板参数替换的地方。实测 `int & &e = i;` 报:`error: cannot declare reference to ‘int&’, which is not a typedef or a template type argument`
+- 模板里的 `T&&` 别当"右值引用"用:它接左值时 `T` 会被推成 `int&`,实参的 const 也一起带进来(`const int ci` 进来是 `const int&`)
+- `T&&` 的函数里忘写 `forward<T>`(只写 `sink(t)`):右值实参也走左值版本,白白多一次拷贝;写成 `sink(std::move(t))`:左值实参也被当右值送走,可能把调用者的对象搬空
+- `T &` 形参接不了右值,报错原文:`cannot bind non-const lvalue reference of type ‘int&’ to an rvalue of type ‘int’`;只读参数写 `const T&`
+- 显式写模板实参(`byFwd<int>(i)`)等于手动指定 T,推导和折叠都不发生 —— 看到"怎么又接不了左值了",先看是不是自己把实参写全了
+- `std::forward` 不带模板实参根本编不过,别指望编译器替你推
