@@ -1,71 +1,87 @@
 # C++ 易错知识点
 
+> 创建时间:2026-09-12
 ## 目录
 
-- [1. 加入了string这种数据类型](#1-加入了string这种数据类型)
-  - [1.1 高频函数速查](#11-高频函数速查)
-  - [1.2 每个函数的最简写法](#12-每个函数的最简写法)
-    - [长度与判空](#长度与判空)
-    - [取字符](#取字符)
-    - [加内容](#加内容)
-    - [原地修改](#原地修改)
-    - [删除](#删除)
-    - [查找](#查找)
-    - [截取](#截取)
-    - [比较](#比较)
-    - [交给 C API 与数字互转](#交给-c-api-与数字互转)
-    - [读一整行](#读一整行)
-    - [遍历](#遍历)
-  - [1.3 九个坑](#13-九个坑)
-- [2. const_cast,static_cast,dynamic_cast](#2-const_caststatic_castdynamic_cast)
-  - [2.1 const_cast](#21-const_cast)
-    - [处理常目标指针](#处理常目标指针)
-  - [2.2 static_cast](#22-static_cast)
-    - [增加可读性](#增加可读性)
-    - [提高安全性](#提高安全性)
-  - [2.3 dynamic_cast](#23-dynamic_cast)
-- [3. 函数重载](#3-函数重载)
-  - [3.1 可以形成重载的情形](#31-可以形成重载的情形)
-  - [3.2 不可以形成重载的情形](#32-不可以形成重载的情形)
-  - [3.3 引用形参](#33-引用形参)
-- [4. 左、右值传递参数，&和&&](#4-左右值传递参数和)
-- [5. 引用&的本质](#5-引用的本质)
-- [6. 枚举](#6-枚举)
-  - [匿名枚举的四种用法](#匿名枚举的四种用法)
-  - [枚举能不能当 #define 用](#枚举能不能当-define-用)
-  - [枚举的 sizeof:由底层类型决定,不是固定 int](#枚举的-sizeof由底层类型决定不是固定-int)
-  - [类内枚举:把枚举定义在类里面](#类内枚举把枚举定义在类里面)
-- [7. 引用返回值解析](#7-引用返回值解析)
-- [8. 异常](#8-异常)
-  - [8.1 栈展开：异常穿过函数时发生了什么](#81-栈展开异常穿过函数时发生了什么)
-  - [8.2 catch 的匹配规则](#82-catch-的匹配规则)
-  - [8.3 别在析构函数里抛异常](#83-别在析构函数里抛异常)
-- [9. 深、浅拷贝](#9-深浅拷贝)
-- [10. 拷贝构造 T(const T &t)](#10-拷贝构造-tconst-t-t)
-- [11. 移动构造 T(T &&t)](#11-移动构造-tt-t)
-- [12. 匿名类对象](#12-匿名类对象)
-- [13. std::move](#13-stdmove)
-- [14. `Cat(const std::string &name) : _name(name) {}` 和 `Cat(std::string name) : _name(std::move(name)) {}`](#14-catconst-stdstring-name--_namename--和-catstdstring-name--_namestdmovename-)
-- [15. 初始化列表](#15-初始化列表)
-  - [15.1 类中的 const 成员数据](#151-类中的-const-成员数据)
-  - [15.2 初始化列表的书写顺序 ≠ 实际初始化顺序](#152-初始化列表的书写顺序--实际初始化顺序)
-  - [15.3 类里直接给成员初值(默认成员初始化器)](#153-类里直接给成员初值默认成员初始化器)
-- [16. 编译期常量:const 与 constexpr](#16-编译期常量const-与-constexpr)
-  - [16.1 编译期常量 vs 运行期只读](#161-编译期常量-vs-运行期只读)
-  - [16.2 constexpr 有什么用](#162-constexpr-有什么用)
-- [17. 继承 + 动态内存管理(深拷贝遇上继承)](#17-继承--动态内存管理深拷贝遇上继承)
-- [18. 同族类类型转换(上行、下行、对象切片)](#18-同族类类型转换上行下行对象切片)
-  - [上行转换:子 → 父,直接赋值就行](#上行转换子--父直接赋值就行)
-  - [下行转换:父 → 子](#下行转换父--子)
-  - [对象之间的转换 = 切片](#对象之间的转换--切片)
-- [19. 模板 T 的类型匹配与引用折叠](#19-模板-t-的类型匹配与引用折叠)
-  - [19.1 四种写法,T 各推成什么](#191-四种写法t-各推成什么)
-  - [19.2 引用折叠:引用的引用是谁](#192-引用折叠引用的引用是谁)
-  - [19.3 为什么模板里的 T&& 左值右值都能接](#193-为什么模板里的-t-左值右值都能接)
-  - [19.4 std::forward<T> 为什么必须写 <T>](#194-stdforwardt-为什么必须写-t)
-  - [19.5 auto&& 是同一条规则](#195-auto-是同一条规则)
+- [C++ 易错知识点](#c-易错知识点)
+  - [目录](#目录)
+  - [1. 加入了string这种数据类型](#1-加入了string这种数据类型)
+    - [1.1 高频函数速查](#11-高频函数速查)
+    - [1.2 每个函数的最简写法](#12-每个函数的最简写法)
+      - [长度与判空](#长度与判空)
+      - [取字符](#取字符)
+      - [加内容](#加内容)
+      - [原地修改](#原地修改)
+      - [删除](#删除)
+      - [查找](#查找)
+      - [截取](#截取)
+      - [比较](#比较)
+      - [交给 C API 与数字互转](#交给-c-api-与数字互转)
+      - [读一整行](#读一整行)
+      - [遍历](#遍历)
+    - [1.3 九个坑](#13-九个坑)
+  - [2. const\_cast,static\_cast,dynamic\_cast](#2-const_caststatic_castdynamic_cast)
+    - [2.1 const\_cast](#21-const_cast)
+      - [处理常目标指针](#处理常目标指针)
+    - [2.2 static\_cast](#22-static_cast)
+      - [增加可读性](#增加可读性)
+      - [提高安全性](#提高安全性)
+    - [2.3 dynamic\_cast](#23-dynamic_cast)
+  - [3. 函数重载](#3-函数重载)
+    - [3.1 可以形成重载的情形](#31-可以形成重载的情形)
+    - [3.2 不可以形成重载的情形](#32-不可以形成重载的情形)
+    - [3.3 引用形参](#33-引用形参)
+  - [4. 左、右值传递参数，\&和\&\&](#4-左右值传递参数和)
+  - [5. 引用\&的本质](#5-引用的本质)
+  - [6. 枚举](#6-枚举)
+    - [匿名枚举的四种用法](#匿名枚举的四种用法)
+    - [枚举能不能当 #define 用](#枚举能不能当-define-用)
+    - [枚举的 sizeof:由底层类型决定,不是固定 int](#枚举的-sizeof由底层类型决定不是固定-int)
+    - [类内枚举:把枚举定义在类里面](#类内枚举把枚举定义在类里面)
+  - [7. 引用返回值解析](#7-引用返回值解析)
+  - [8. 异常](#8-异常)
+    - [8.1 栈展开：异常穿过函数时发生了什么](#81-栈展开异常穿过函数时发生了什么)
+    - [8.2 catch 的匹配规则](#82-catch-的匹配规则)
+    - [8.3 别在析构函数里抛异常](#83-别在析构函数里抛异常)
+  - [9. 深、浅拷贝](#9-深浅拷贝)
+  - [10. 拷贝构造 T(const T \&t)](#10-拷贝构造-tconst-t-t)
+  - [11. 移动构造 T(T \&\&t)](#11-移动构造-tt-t)
+  - [12. 匿名类对象](#12-匿名类对象)
+  - [13. std::move](#13-stdmove)
+  - [14. `Cat(const std::string &name) : _name(name) {}` 和 `Cat(std::string name) : _name(std::move(name)) {}`](#14-catconst-stdstring-name--_namename--和-catstdstring-name--_namestdmovename-)
+  - [15. 初始化列表](#15-初始化列表)
+    - [15.1 类中的 const 成员数据](#151-类中的-const-成员数据)
+    - [15.2 初始化列表的书写顺序 ≠ 实际初始化顺序](#152-初始化列表的书写顺序--实际初始化顺序)
+    - [15.3 类里直接给成员初值(默认成员初始化器)](#153-类里直接给成员初值默认成员初始化器)
+  - [16. 编译期常量:const 与 constexpr](#16-编译期常量const-与-constexpr)
+    - [16.1 编译期常量 vs 运行期只读](#161-编译期常量-vs-运行期只读)
+    - [16.2 constexpr 有什么用](#162-constexpr-有什么用)
+  - [17. 继承 + 动态内存管理(深拷贝遇上继承)](#17-继承--动态内存管理深拷贝遇上继承)
+  - [18. 同族类类型转换(上行、下行、对象切片)](#18-同族类类型转换上行下行对象切片)
+    - [上行转换:子 → 父,直接赋值就行](#上行转换子--父直接赋值就行)
+    - [下行转换:父 → 子](#下行转换父--子)
+    - [对象之间的转换 = 切片](#对象之间的转换--切片)
+  - [19. 模板 T 的类型匹配与引用折叠](#19-模板-t-的类型匹配与引用折叠)
+    - [19.1 四种写法,T 各推成什么](#191-四种写法t-各推成什么)
+    - [19.2 引用折叠:引用的引用是谁](#192-引用折叠引用的引用是谁)
+    - [19.3 为什么模板里的 T\&\& 左值右值都能接](#193-为什么模板里的-t-左值右值都能接)
+    - [19.4 std::forward 为什么必须写 ](#194-stdforward-为什么必须写-)
+    - [19.5 auto\&\& 是同一条规则](#195-auto-是同一条规则)
+  - [20. 函数模板在什么时候“生成”函数](#20-函数模板在什么时候生成函数)
+    - [20.1 生成发生在编译期:`.o` 里已经是机器码](#201-生成发生在编译期o-里已经是机器码)
+    - [20.2 一个类型一份,多份靠 weak 符号合并(模板为什么要写 `.h`)](#202-一个类型一份多份靠-weak-符号合并模板为什么要写-h)
+    - [20.3 反例:头文件只留声明 → 编译能过,链接才炸](#203-反例头文件只留声明--编译能过链接才炸)
+    - [20.4 谁触发实例化:隐式、显式、`extern template`](#204-谁触发实例化隐式显式extern-template)
+    - [20.5 编译期“求值”和编译期“生成函数”不是一回事](#205-编译期求值和编译期生成函数不是一回事)
+    - [20.6 `static_assert` 只有被实例化时才检查](#206-static_assert-只有被实例化时才检查)
+  - [21. 成员函数末尾的 const](#21-成员函数末尾的-const)
+    - [21.1 末尾 const 修饰谁](#211-末尾-const-修饰谁)
+    - [21.2 为什么参数加了 const,末尾也必须加 —— 四种组合](#212-为什么参数加了-const末尾也必须加--四种组合)
+    - [21.3 那按值传参为什么不报错](#213-那按值传参为什么不报错)
+    - [21.4 该加的、不该加的](#214-该加的不该加的)
 
 ## 1. 加入了string这种数据类型
+> 记录于:2026-09-12
 
 一句话：高频函数就三类——问大小、拿一段、改它自己。带"改"的函数（insert / erase / replace / += / clear …）一律原地生效，不留原样；find / substr / 比较这类只读，不动原串。
 
@@ -208,6 +224,7 @@ for (size_t i = 0; i < s.size(); i++) cout << s[i];   // abc
 9. **`getline` 前面若有 `cin >>`**：缓冲区里剩下的换行要先 `cin.ignore(1000, '\n')` 吃掉，否则 `getline` 直接读到空行。
 
 ## 2. const_cast,static_cast,dynamic_cast
+> 记录于:2026-09-12
 
 - const_cast：专用于去除指针或引用的 const 属性
 - static_cast：与旧式转换相近，但提供了更易于查找的语法，并能有效识别不兼容类型
@@ -408,6 +425,7 @@ dynamic_cast 多花的那点运行期时间,买的就是这个检查。
 - 编译加 `-fno-rtti` 时 dynamic_cast 直接不可用
 
 ## 3. 函数重载
+> 记录于:2026-09-12
 
 ### 3.1 可以形成重载的情形
 
@@ -490,6 +508,7 @@ int main()
 ```
 
 ## 4. 左、右值传递参数，&和&&
+> 记录于:2026-09-14
 
 - 左值（lvalue）：有名字、有地址、能持续存在的表达式。可以放在赋值号左边
 - 右值（rvalue）：临时值、字面量、即将销毁的表达式。不能取地址，通常只能放在赋值号右边
@@ -586,6 +605,7 @@ int main()
 - 普通引用绑右值编译报错 `cannot bind non-const lvalue reference of type 'int&' to an rvalue of type 'int'`
 
 ## 5. 引用&的本质
+> 记录于:2026-09-14
 
 一句话:引用不是对象,它只是**给已有对象起第二个名字**(别名)。编译器背地里用常量指针实现,但语言层面看不到那层指针。
 
@@ -641,6 +661,7 @@ sizeof(int)=4 sizeof(r)=4
 - 引用初始化必须绑**同类型**对象(const 引用可以绑兼容类型,代价是会产生临时对象)
 
 ## 6. 枚举
+> 记录于:2026-09-12
 
 对于具有确定元素个数的数组、容器或集合，都可以使用枚举循环来逐个遍历元素。
 
@@ -1172,6 +1193,7 @@ sizeof(F2) = 1, sizeof(F2::Mode) = 1
 - `enum class` 不能隐式转成 `int`(要打印得写 `(int)File::Mode::write`),普通类内枚举可以
 
 ## 7. 引用返回值解析
+> 记录于:2026-09-12
 
 来源:routine/0915/Counter &.cpp
 
@@ -1243,6 +1265,7 @@ warning: reference to local variable 'x' returned [-Wreturn-local-addr]
 什么时候**别**返回引用:局部变量、函数里 new 出来的临时对象(拿不到引用就没人 delete 了)。只读的大对象可以返回 `const T &` 省一次拷贝,前提还是它活得够久。
 
 ## 8. 异常
+> 记录于:2026-09-12
 
 一句话:throw 抛出,catch 接住,中间经过的那一串函数会被"层层清场"再跳到能接住它的那个 catch。
 
@@ -1361,6 +1384,7 @@ note: in C++11 destructors default to 'noexcept'
 - 写了 catch 就要处理或继续往上抛,空 catch 是最难查的 bug
 
 ## 9. 深、浅拷贝
+> 记录于:2026-09-14
 
 一句话:浅拷贝 = 成员**逐个照抄**(指针成员照抄的是地址,于是两个对象共用一块内存);深拷贝 = 指针成员**重新申请一块内存,把内容搬一份**过去。
 
@@ -1448,6 +1472,7 @@ a.p = hello  b.p = Hello
 法则:**需要自己写析构的类,通常也需要自己写拷贝构造和拷贝赋值**(三法则);C++11 再加移动构造、移动赋值,合称五法则。典型需要它们的:类里攥着裸指针 / new 出来的资源。反过来,成员都是 `string` / `vector` 这类自己管资源的类型时,默认的拷贝就够用 —— 它们内部已经帮你深拷贝好了。
 
 ## 10. 拷贝构造 T(const T &t)
+> 记录于:2026-09-14
 
 一句话:拷贝构造是"用同类型的另一个对象来初始化**新对象**"时调用的构造函数 —— 它是构造函数,不是赋值。
 
@@ -1527,6 +1552,7 @@ e = std::move(d);
 不想让对象被拷贝:`T(const T &) = delete;`(用到时报 use of deleted function 编译错误,语句本身写得很清楚)。
 
 ## 11. 移动构造 T(T &&t)
+> 记录于:2026-09-14
 
 一句话:移动构造的参数是**右值引用**,它不复制资源,而是把源对象的资源"搬"过来(指针窃取),再把源对象置空。
 
@@ -1638,6 +1664,7 @@ NoDtor:
 - 以为"写了 std::move 就一定走移动":类里压根没有移动构造时,照样走拷贝
 
 ## 12. 匿名类对象
+> 记录于:2026-09-14
 
 匿名对象 = 没有名字的对象，直接写"类名 + 构造实参"造出来，例如 `Cat("Tom")`，也叫临时对象。
 
@@ -1677,6 +1704,7 @@ Tmp &&rr = Tmp(3);       // 右值引用绑定，同样延长
 - C++17 起 `Cat c = Cat("x");` 是就地构造，不产生临时对象；所以别拿"析构调了几次"去猜性能，编译器可能一次都没造临时对象
 
 ## 13. std::move
+> 记录于:2026-09-14
 
 一句话：`std::move` 不移动任何东西，它只把拿到的表达式转成右值引用 `T&&`，好让编译器允许"搬走"。
 
@@ -1703,6 +1731,7 @@ f("tmp");                 // √ 临时对象本来就是右值
 4. move 之后再去读源对象是 bug：它只是"有效"，不是"还是老样子"
 
 ## 14. `Cat(const std::string &name) : _name(name) {}` 和 `Cat(std::string name) : _name(std::move(name)) {}`
+> 记录于:2026-09-14
 
 两种存成员的写法：
 
@@ -1732,6 +1761,7 @@ B 里 `_name(std::move(name))` 的 `std::move` 不能省：形参 `name` 是有�
 
 
 ## 15. 初始化列表
+> 记录于:2026-09-14
 
 ```cpp
 class Point {
@@ -2073,6 +2103,7 @@ error: non-static data member initializers only available with ‘-std=c++11’ 
 - 老教材里看不到这个写法,因为它是 C++11 才加的(`-std=c++11` 起)
 
 ## 16. 编译期常量:const 与 constexpr
+> 记录于:2026-09-15
 
 ### 16.1 编译期常量 vs 运行期只读
 
@@ -2254,6 +2285,7 @@ error: '(1 / 0)' is not a constant expression
 记忆锚点:constexpr 就是把活挪到编译时 —— 该算的值提前算成常量,必须编译期算的地方填得上,顺手替掉宏函数,还能在编译期抓错。
 
 ## 17. 继承 + 动态内存管理(深拷贝遇上继承)
+> 记录于:2026-09-15
 
 来源:routine/0915/继承动态内存管理.cpp
 
@@ -2429,6 +2461,7 @@ int main(int argc, char const *argv[])
 记忆锚点:派生类的三件事都"分两半" —— 基类那半用 `Person(r)` / `Person::operator=(r)` 显式交出去,自己那半自己 new/delete;基类析构加 `virtual`,`delete 基类指针` 才安全。
 
 ## 18. 同族类类型转换(上行、下行、对象切片)
+> 记录于:2026-09-16
 
 来源:routine/0915/同族类.cpp
 
@@ -2667,6 +2700,7 @@ cout << a.y << endl;   // error: ‘class A’ has no member named ‘y’
 - 单继承时父子指针地址相同(`&b` 和 `pa` 打出来是一个地址),**多重继承下不一定**:父类子对象不在对象开头,转父类指针时会加偏移 —— `struct D : A, B` 的 `D x`,`A *pa = &x` 得到 `0x…13c`,而 `B *pb = &x` 得到 `0x…140`,差了 4 字节。先记住单继承的结论,多重继承的等后面用到再说。
 
 ## 19. 模板 T 的类型匹配与引用折叠
+> 记录于:2026-09-16
 
 一句话:模板里的 `T` 不是你自己指定的,是编译器拿**实参**反推出来的;形参写成 `T` / `T&` / `const T&` / `T&&` 会各推出一套结果,而模板里的 `T&&` 之所以左值右值都能接,靠的就是**引用折叠**。
 
@@ -2906,3 +2940,473 @@ auto&& 接右值,是右值引用: 1
 - `T &` 形参接不了右值,报错原文:`cannot bind non-const lvalue reference of type ‘int&’ to an rvalue of type ‘int’`;只读参数写 `const T&`
 - 显式写模板实参(`byFwd<int>(i)`)等于手动指定 T,推导和折叠都不发生 —— 看到"怎么又接不了左值了",先看是不是自己把实参写全了
 - `std::forward` 不带模板实参根本编不过,别指望编译器替你推
+
+## 20. 函数模板在什么时候“生成”函数
+> 记录于:2026-09-17
+
+一句话:函数模板自己不是函数,只是一张“模板”;编译器在**编译**用到它的那个 `.cpp` 时,按实参类型就地生成一个普通函数(这个过程叫**实例化**),不是运行时,运行时那边也一点开销都没有。
+
+| 阶段 | 模板发生的事 |
+| --- | --- |
+| 编译某个 `.cpp` | 按实参类型实例化出具体函数,写进这个 TU 的 `.o`;名字被 mangle 成 `_Z3addIiET_S0_S0_` 这种 |
+| 链接 | 各 `.o` 里生成的那几份同名实例是 `WEAK`/COMDAT 符号,链接器合并成一份 |
+| 运行 | 什么都不发生:调用的就是普通函数,和手写重载一样 |
+
+### 20.1 生成发生在编译期:`.o` 里已经是机器码
+
+```cpp
+#include <cstdio>
+
+template <class T>
+T add(T a, T b) { return a + b; }
+
+int main()
+{
+    printf("%d\n", add(1, 2));
+    add(1.5, 2.5);
+    add('a', 'b');
+}
+```
+
+只编译、不链接,看 `t.o` 的符号表:
+
+```
+g++ -c t.cpp -o t.o
+nm -C --defined-only t.o | grep 'add<'
+```
+
+实测输出:
+
+```
+0000000000000000 W char add<char>(char, char)
+0000000000000000 W double add<double>(double, double)
+0000000000000000 W int add<int>(int, int)
+```
+
+三种实参类型 = 三份代码,`W` 表示 weak 符号(下面 20.2 用得上)。再看 `add<int>` 那份的真身:
+
+```
+objdump -d --demangle t.o | sed -n '/add<int>/,/ret/p'
+```
+
+实测输出:
+
+```
+0000000000000000 <int add<int>(int, int)>:
+   0:	f3 0f 1e fa         	endbr64
+   4:	55                  	push   %rbp
+   5:	48 89 e5            	mov    %rsp,%rbp
+   8:	89 7d fc            	mov    %edi,-0x4(%rbp)
+   b:	89 75 f8            	mov    %esi,-0x8(%rbp)
+   e:	8b 55 fc            	mov    -0x4(%rbp),%edx
+  11:	8b 45 f8            	mov    -0x8(%rbp),%eax
+  14:	01 d0               	add    %edx,%eax
+  16:	5d                  	pop    %rbp
+  17:	c3                  	ret
+```
+
+这就是普通函数:参数入栈、`add` 一下、`ret`。所以 `-c` 出来的 `.o` 里机器码已经齐了,链接期和运行期都插不上手。
+
+### 20.2 一个类型一份,多份靠 weak 符号合并(模板为什么要写 `.h`)
+
+`hdr.h` 里写模板定义,`u1.cpp` 和 `u2.cpp` 各自 `#include` 它、各调一次 `add(1, 2)`:
+
+```cpp
+// hdr.h
+#pragma once
+
+template <class T>
+T add(T a, T b) { return a + b; }   // 定义就写在头文件里
+```
+
+```cpp
+// u1.cpp(实际是 #include "hdr.h",这里把展开后的定义写出来);u2.cpp 一模一样,只是函数名换成 f2
+template <class T>
+T add(T a, T b) { return a + b; }
+
+int f1() { return add(1, 2); }
+```
+
+两个 `.o` **各自都生成了** `add<int>`:
+
+```
+g++ -c u1.cpp -o u1.o ; g++ -c u2.cpp -o u2.o
+nm -C --defined-only u1.o | grep 'add<'
+nm -C --defined-only u2.o | grep 'add<'
+```
+
+实测输出:
+
+```
+0000000000000000 W int add<int>(int, int)
+0000000000000000 W int add<int>(int, int)
+```
+
+两份同名符号没打架,靠的是 `WEAK` 和它所在的那节 COMDAT:
+
+```
+readelf -sW u1.o | grep _Z3add
+```
+
+实测输出:
+
+```
+3: 0000000000000000     0 SECTION LOCAL  DEFAULT    6 .text._Z3addIiET_S0_S0_
+5: 0000000000000000    24 FUNC    WEAK   DEFAULT    6 _Z3addIiET_S0_S0_
+```
+
+两份合起来只剩一份:
+
+```
+g++ u1.o u2.o -shared -o libu.so
+nm -C --defined-only libu.so | grep 'add<'
+```
+
+实测输出:
+
+```
+0000000000001132 W int add<int>(int, int)
+```
+
+要点:不是“编译器只生成一次”,而是**每个用到它的 TU 各生成一份**,靠 `WEAK` 符号在链接期合并成一份。反过来说,模板的定义必须对“使用它的那个 TU”可见,这就是模板一律写进头文件的原因。
+
+### 20.3 反例:头文件只留声明 → 编译能过,链接才炸
+
+```cpp
+// a.cpp(头文件里只写了声明的展开版)
+template <class T>
+T add2(T a, T b);          // 只有声明
+
+int main() { return add2(1, 2); }
+```
+
+```cpp
+// def.cpp:定义在这儿,但这个文件自己不调用 add2
+template <class T>
+T add2(T a, T b) { return a + b; }
+```
+
+`a.cpp` 编译一帆风顺,`.o` 里只欠着一条引用:
+
+```
+nm -C a.o | grep add2
+```
+
+实测输出:
+
+```
+                 U int add2<int>(int, int)
+```
+
+`def.cpp` 编出来的 `.o` 里**什么都没有** —— 定义了模板但没人用,就不生成。于是链接阶段:
+
+```
+g++ a.o def.o -o a.bin
+```
+
+实测输出:
+
+```
+/usr/bin/x86_64-linux-gnu-ld.bfd: a.o: in function `main':
+a.cpp:(.text+0x13): undefined reference to `int add2<int>(int, int)'
+collect2: error: ld returned 1 exit status
+```
+
+`U` = 未定义引用(undefined)。将来看到**带模板实参**的 `undefined reference to ‘int f<int>(int)’`,先查“定义在哪、那个 TU 看得见吗”,别去怀疑运行时。
+
+### 20.4 谁触发实例化:隐式、显式、`extern template`
+
+1. **隐式实例化**(日常默认):用到了就生成,类型从调用现场推。
+
+```cpp
+#include <cstdio>
+
+template <class T>
+T add(T a, T b) { return a + b; }
+
+int main()
+{
+    printf("%d\n", add(1, 2));      // 生成 add<int>
+    printf("%f\n", add(1.5, 2.5));  // 生成 add<double>
+}
+```
+
+2. **显式实例化定义**(`template` 开头、后面给全类型):没人调用也生成,可以把“生成”集中放一个 `.cpp` 里。
+
+```cpp
+template <class T>
+T add(T a, T b) { return a + b; }
+
+template double add<double>(double, double);   // 显式实例化:没人调用也生成
+template int add<int>(int, int);
+```
+
+```
+g++ -c e.cpp -o e.o ; nm -C --defined-only e.o | grep 'add<'
+```
+
+实测输出(两个都没被调用,照样有):
+
+```
+0000000000000000 W double add<double>(double, double)
+0000000000000000 W int add<int>(int, int)
+```
+
+3. **实例化声明 `extern template`**(C++11):告诉编译器“这份实例在别处生成,本 TU 别生成”,只留一条欠着的引用 —— 这是压编译时间的手段。
+
+```cpp
+template <class T>
+T add(T a, T b) { return a + b; }
+
+extern template int add<int>(int, int);        // 告诉编译器:这份实例在别处生成
+
+int g() { return add(1, 2); }
+```
+
+```
+g++ -c x.cpp -o x.o ; nm -C x.o | grep 'add<'
+```
+
+实测输出:
+
+```
+                 U int add<int>(int, int)
+```
+
+### 20.5 编译期“求值”和编译期“生成函数”不是一回事
+
+实例化生成的是**函数体**;`constexpr` / `consteval` 生成的是**一个值**。两者都发生在编译期,但用途不同:模板解决“写一遍对付各种类型”,`constexpr` 解决“把计算提前到编译期”。
+
+```cpp
+#include <iostream>
+using namespace std;
+
+// 编译期"求值":算出来的是值,不是函数体
+constexpr int factorial(int n) { return n <= 1 ? 1 : n * factorial(n - 1); }
+
+// 模板元编程:靠模板特化递归算值
+template <int N>
+struct Fact { static constexpr int value = N * Fact<N - 1>::value; };
+template <>
+struct Fact<0> { static constexpr int value = 1; };
+
+int main()
+{
+    constexpr int a = factorial(5);   // 编译期就变成 120
+    cout << a << " " << Fact<5>::value << endl;
+}
+```
+
+实测输出:
+
+```
+120 120
+```
+
+C++20 的 `consteval` 是更硬的版本:必须在编译期算,运行期调不过编译(要 `-std=c++20`):
+
+```cpp
+#include <iostream>
+using namespace std;
+
+consteval int square(int n) { return n * n; }
+
+int main()
+{
+    constexpr int y = square(4);   // 编译期
+    cout << y << endl;
+    // int z = square(rand());     // 错误:consteval 不许在运行期调用
+}
+```
+
+实测输出:
+
+```
+16
+```
+
+### 20.6 `static_assert` 只有被实例化时才检查
+
+模板没被实例化之前,里面的 `static_assert` 看着人畜无害;一实例化就炸,报错还带一整条调用链,看着像运行时,其实全是编译期:
+
+```cpp
+#include <type_traits>
+
+template <class T>
+int only_int(T)
+{
+    static_assert(std::is_integral<T>::value, "T 必须是整数");
+    return 0;
+}
+
+int main()
+{
+    only_int(1);
+    only_int(1.0);   // 加了这句才会炸
+}
+```
+
+实测报错:
+
+```
+s.cpp: In instantiation of ‘int only_int(T) [with T = double]’:
+s.cpp:13:13:   required from here
+s.cpp:6:40: error: static assertion failed: T 必须是整数
+s.cpp:6:40: note: ‘std::integral_constant<bool, false>::value’ evaluates to false
+```
+
+坑:
+
+- **模板定义写进 `.cpp` 就等着 `undefined reference`**:定义必须对“使用它的那个 TU”可见;真要放 `.cpp`,就在那儿补一行显式实例化 `template int add<int>(int, int);` 把代码生成出来(见 20.3、20.4)
+- **别把“实例化”当成运行时的东西**:报错行里的 `In instantiation of ...` / `required from here` 是编译器在告诉你“我从这个调用点往里展开模板时出错了”,不是运行期信息
+- **两阶段查找**:模板定义时先查跟 `T` 无关的名字,跟 `T` 有关的名字推迟到实例化那一刻才查(靠实参类型做 ADL)。所以“定义时看着没毛病、一实例化就说找不到函数”属于正常现象
+- **代码膨胀**:每个类型组合一份独立代码,`add<int>` 和 `add<long>` 是两份,`vector<A>` 和 `vector<B>` 也是两份;类型多、模板嵌套深时二进制会涨,这也是模板让编译变慢的主要原因
+- **运行时零开销**:模板不引入任何运行期机制 —— 没有类型信息、没有查表、没有动态生成代码,和手写重载一样;真正“运行时代码生成”的只有 JIT 那类库(如 Cling、LLVM ORC),跟标准 C++ 模板不是一回事
+- **`WEAK` 只保模板这类多处生成的实体**:两个 `.cpp` 都实例化 `add<int>` 不会撞车(20.2);但**非模板**的函数/变量写进头文件而不加 `inline`(或 `static`),是真的会 `multiple definition`
+
+## 21. 成员函数末尾的 const
+> 记录于:2026-09-17
+
+一句话:成员函数末尾那个 `const` 修饰的是隐藏的 `this`,含义是“我不改自己”;参数上的 `const` 管的是对方。两者互不替代 —— 参数写 `const T&` 只解决“别人能不能传进来”,末尾 `const` 才解决“我能不能被 const 对象调用”。
+
+### 21.1 末尾 const 修饰谁
+
+```cpp
+class Cat {
+    int age_;
+public:
+    int operator*(const Cat &other) const;   // 末尾 const:承诺不改自己
+};
+```
+
+展开看,末尾的 const 就是把隐藏的 this 声明成 `const Cat *`(相当于 `int Cat::operator*(const Cat *this, const Cat &other);`,真写出来是语法错误,这行只是帮助理解):
+
+所以它决定的是**谁有资格调用这个成员函数**:
+
+| 调用方 | 非 const 成员函数 | const 成员函数 |
+| --- | --- | --- |
+| `Cat c;` 普通对象 | ✓ | ✓ |
+| 临时对象 `Cat("Tom", 18)` | ✓ | ✓ |
+| `const Cat cc;` | ✗ | ✓ |
+| `const Cat &r` / `const Cat *p` | ✗ | ✓ |
+
+同一个类里一个函数写两版,就能看出差别:
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Cat {
+    string name_;
+    int age_;
+public:
+    Cat(string name, int age) : name_(std::move(name)), age_(age) {}
+    int  getAgeNC()       { return age_; }   // 非 const 版本
+    int  getAge() const   { return age_; }   // const 版本
+};
+
+int main() {
+    Cat c("Jack", 5);
+    const Cat cc("Rose", 2);
+
+    cout << "非const对象  -> 非const: " << c.getAgeNC() << " | const: " << c.getAge() << endl;
+    cout << "const对象    -> const: " << cc.getAge() << endl;
+    // cc.getAgeNC();        // 这一行会报错
+    cout << "临时对象     -> 非const: " << Cat("Tom", 18).getAgeNC()
+         << " | const: " << Cat("Ann", 7).getAge() << endl;
+}
+```
+
+实测输出:
+
+```
+非const对象  -> 非const: 5 | const: 5
+const对象    -> const: 2
+临时对象     -> 非const: 18 | const: 7
+```
+
+把 `cc.getAgeNC();` 的注释去掉,立刻报:
+
+```
+error: passing ‘const Cat’ as ‘this’ argument discards qualifiers [-fpermissive]
+note:   in call to ‘int Cat::getAgeNC()’
+```
+
+翻译:要把一个 `const Cat` 当 `this` 传进去,这会丢掉 const,所以编译器拒绝。
+
+### 21.2 为什么参数加了 const,末尾也必须加 —— 四种组合
+
+`a1 * a2` 会被当成 `a1.operator*(a2)`,a1 就是这次调用的 `this`。参数写成 `const T&` 之后,a1 是 const 左值,它的 `this` 就是 `const Cat*`,只有末尾带 const 的成员函数接得住:
+
+| 成员函数写法 | 用 `fun(const T&, const T&)` 调 | 结果 |
+| --- | --- | --- |
+| `int operator*(Cat &other)` | 参数、this 都不够 | ✗ `passing ‘const Cat’ as ‘this’ argument discards qualifiers` |
+| `int operator*(const Cat &other)` | 参数够了,this 不够 | ✗ 同一个错 |
+| `int operator*(Cat &other) const` | this 够了,参数不够 | ✗ `binding reference of type ‘Cat&’ to ‘const Cat’ discards qualifiers` |
+| `int operator*(const Cat &other) const` | 两个都够 | ✓ |
+
+两种都写全的完整程序:
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+template <class T>
+int fun(const T &a1, const T &a2) { return a1 * a2; }
+
+class Cat {
+    string name_;
+    int age_;
+public:
+    Cat(string name, int age) : name_(std::move(name)), age_(age) {}
+    int operator*(const Cat &other) const { return age_ * other.age_; }
+};
+
+int main() {
+    Cat c1("Jack", 5), c2("Rose", 2);
+    cout << fun(c1, c2) << endl;
+}
+```
+
+实测输出:
+
+```
+10
+```
+
+看第二行和第三行的错法不一样:参数上的 const 和末尾的 const 各自管一头,谁缺了都在自己那头报错。**参数 const 让对方能收 const 对象,末尾 const 让自己能被 const 上下文调用。**
+
+### 21.3 那按值传参为什么不报错
+
+因为按值传进函数体的形参是**非 const 的副本**(第 19 节那条:按值传参会剥掉顶层 const),副本能调非 const 成员函数:
+
+```cpp
+template <class T>
+int fun(T a1, T a2) { return a1 * a2; }   // 形参按值, 副本不带 const
+```
+
+同样的类、同样的 `operator*(Cat &other)`,这个版本能编过,输出还是 `10`。
+
+所以没写末尾 const 不算“写错”,算“挑食”:只要下面任一条成立,它就立刻编不过 ——
+
+- `fun` 的形参改成 `const T&`(省一次拷贝,推荐写法)
+- 拿 `const Cat cc(...)`、`const Cat &r`、`const Cat *p` 来调
+- 对象是容器里的 const 元素(`for (const auto &c : v)` 里的 `c`)
+- 被某个 const 成员函数里的代码使用
+
+### 21.4 该加的、不该加的
+
+- **加**:getter、`>` `<` `==` `!=`、`*` `+` `-` 这类比较/算术运算符 —— 它们只看不改,加了才“哪里都能用”
+- **不加**:`+=` `-=`、`setAge`、`swap`、`operator=`(赋值运算符必须改自己,加了 const 编不过)
+- 两种都要就写 const 重载,编译器按 this 的 const 性挑
+- 例外:标了 `mutable` 的成员,在 const 成员函数里也能改(缓存、计数这类“逻辑上不算改状态”的东西)
+
+坑:
+
+- **三个 const 位置别混**:返回值 `const Cat operator+()`、参数 `const Cat &other`、末尾 `operator+() const` —— 管的对象各不相同,末尾那个只管 `this`
+- **末尾 const 的函数里,`this` 是 `const Cat*`**:不能改成员(除非 `mutable`),也不能调用同类的非 const 成员函数
+- **两种报错对号入座**:`passing ‘const X’ as ‘this’ argument discards qualifiers` = 成员函数少了末尾 const;`binding reference of type ‘X&’ to ‘const X’ discards qualifiers` = 参数少了 const
+- **末尾 const 只挡自己不改,挡不住“漏出去”**:const 成员函数返回成员的引用/指针,外面照样能借它改内部;要么返回 const 引用,要么返回副本
+- **想自检就换成 const 对象调一遍**:自己在 const 上下文里的行为,只有 `const Cat cc;` 或 `const Cat &r = c;` 才试得出来
